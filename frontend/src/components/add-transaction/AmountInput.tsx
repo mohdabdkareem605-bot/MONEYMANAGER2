@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, TextInput, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS } from '../../constants/theme';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
 
 interface AmountInputProps {
   amount: string;
@@ -10,95 +10,133 @@ interface AmountInputProps {
 }
 
 export default function AmountInput({ amount, setAmount, currency, setCurrency }: AmountInputProps) {
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Formatted Date
+  const dateStr = new Date().toLocaleDateString('en-US', {
+    month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
   });
+  const timeStr = new Date().toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  const fullDateDisplay = `${dateStr}, ${timeStr}`;
+
+  const handleCurrencyToggle = () => {
+    setCurrency(currency === 'AED' ? 'USD' : 'AED');
+  };
 
   return (
-    <View style={styles.container}>
-      {/* Date Row */}
-      <Text style={styles.dateText}>{currentDate}</Text>
+    <View style={styles.card}>
+      {/* Row 1: Date */}
+      <View style={styles.row}>
+        <Text style={styles.label}>Date</Text>
+        <Text style={styles.dateValue}>{fullDateDisplay}</Text>
+      </View>
 
-      {/* Amount Row */}
-      <View style={styles.inputWrapper}>
-        <TextInput
-          style={styles.input}
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="0.00"
-          placeholderTextColor="#C7C7CC"
-          keyboardType="numeric"
-          textAlign="center"
-        />
+      {/* Row 2: Amount */}
+      <View style={[styles.row, { marginTop: 20 }]}>
+        <Text style={styles.label}>Amount</Text>
+        
+        <View style={styles.amountContainer}>
+          <TouchableOpacity 
+            style={styles.currencyChip} 
+            onPress={handleCurrencyToggle}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.currencyText}>{currency}</Text>
+          </TouchableOpacity>
+
+          <View style={[
+            styles.inputUnderline, 
+            { borderColor: isFocused ? COLORS.primary : COLORS.border }
+          ]}>
+            <TextInput
+              style={styles.input}
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0"
+              placeholderTextColor="#C7C7CC"
+              keyboardType="numeric"
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+            />
+          </View>
+        </View>
       </View>
-      
-      {/* Currency Chip */}
-      <View style={styles.currencyToggle}>
-        <TouchableOpacity 
-          style={[styles.currencyChip, currency === 'AED' && styles.activeChip]}
-          onPress={() => setCurrency('AED')}
-        >
-          <Text style={[styles.currencyText, currency === 'AED' && styles.activeText]}>AED</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.currencyChip, currency === 'USD' && styles.activeChip]}
-          onPress={() => setCurrency('USD')}
-        >
-          <Text style={[styles.currencyText, currency === 'USD' && styles.activeText]}>USD</Text>
-        </TouchableOpacity>
-      </View>
+
+      {/* Row 3: Rate (Conditional) */}
+      {currency !== 'AED' && (
+        <View style={styles.rateRow}>
+          <Text style={styles.rateText}>Rate: 1 USD = 3.67 AED</Text>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
+  card: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.l,
+    marginHorizontal: 24,
     marginVertical: 24,
+    padding: SPACING.l,
+    ...SHADOWS.soft,
   },
-  dateText: {
-    fontSize: 12,
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  label: {
+    fontSize: 14,
     color: COLORS.textSecondary,
     fontWeight: '500',
-    marginBottom: 8,
   },
-  inputWrapper: {
+  dateValue: {
+    fontSize: 14,
+    color: COLORS.black,
+    fontWeight: '700',
+  },
+  amountContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
   },
-  input: {
-    fontSize: 48,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    minWidth: 100,
-  },
-  currencyToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
-    padding: 4,
-    marginTop: 8,
-  },
   currencyChip: {
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-  },
-  activeChip: {
-    backgroundColor: COLORS.primary,
+    marginRight: 12,
   },
   currencyText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
-  activeText: {
     color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  inputUnderline: {
+    borderBottomWidth: 2,
+    paddingBottom: 4,
+    minWidth: 100,
+  },
+  input: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    textAlign: 'right',
+    padding: 0,
+    includeFontPadding: false,
+  },
+  rateRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+  },
+  rateText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
   },
 });
