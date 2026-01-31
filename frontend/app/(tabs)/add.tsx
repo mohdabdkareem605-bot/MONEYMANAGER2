@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   Utensils, Coffee, Car, ShoppingBag, Banknote, CreditCard, 
-  Landmark, Plane, Home, Smartphone, Briefcase, Gift, Coins 
+  Landmark, Plane, Home, Smartphone, Briefcase, Gift, Coins, User
 } from 'lucide-react-native';
 import { COLORS, RADIUS, SHADOWS } from '../../src/constants/theme';
 
@@ -12,6 +12,8 @@ import AmountInput from '../../src/components/add-transaction/AmountInput';
 import TransactionDetails from '../../src/components/add-transaction/TransactionDetails';
 import SplitExpenseSection from '../../src/components/add-transaction/SplitExpenseSection';
 import SelectionSheet from '../../src/components/add-transaction/SelectionSheet';
+import TransferTypeToggle from '../../src/components/add-transaction/TransferTypeToggle';
+import TransferDetails from '../../src/components/add-transaction/TransferDetails';
 
 // Data Mock
 const EXPENSE_CATEGORIES = [
@@ -37,44 +39,92 @@ const ACCOUNTS = [
   { id: '3', label: 'Chase Bank', icon: Landmark },
 ];
 
+const FRIENDS = [
+  { id: '101', label: 'Alice', icon: User },
+  { id: '102', label: 'Bob', icon: User },
+  { id: '103', label: 'Charlie', icon: User },
+];
+
 export default function AddTransaction() {
   const [type, setType] = useState('Expense'); // 'Income' | 'Expense' | 'Transfer'
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<'USD' | 'AED'>('AED');
   const [note, setNote] = useState('');
   
+  // Transfer Mode State
+  const [transferType, setTransferType] = useState('Internal Transfer'); // 'Internal Transfer' | 'Pay Friend'
+
   const [category, setCategory] = useState(EXPENSE_CATEGORIES[0]);
   const [account, setAccount] = useState(ACCOUNTS[0]);
   
-  const [sheetVisible, setSheetVisible] = useState(false);
-  const [sheetType, setSheetType] = useState<'category' | 'account'>('category');
+  // Transfer Specific
+  const [fromAccount, setFromAccount] = useState(ACCOUNTS[0]);
+  const [toAccount, setToAccount] = useState(ACCOUNTS[1]); // Default different
+  const [friend, setFriend] = useState(FRIENDS[0]);
 
-  // Update default category when type changes
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [sheetType, setSheetType] = useState<'category' | 'account' | 'fromAccount' | 'toAccount' | 'friend'>('category');
+
+  // Reset defaults on type change
   useEffect(() => {
-    if (type === 'Income') {
-      setCategory(INCOME_CATEGORIES[0]);
-    } else if (type === 'Expense') {
-      setCategory(EXPENSE_CATEGORIES[0]);
-    }
+    if (type === 'Income') setCategory(INCOME_CATEGORIES[0]);
+    if (type === 'Expense') setCategory(EXPENSE_CATEGORIES[0]);
   }, [type]);
 
+  // Handlers for Standard Mode
   const handleOpenCategory = () => {
     setSheetType('category');
     setSheetVisible(true);
   };
-
   const handleOpenAccount = () => {
     setSheetType('account');
     setSheetVisible(true);
   };
 
-  const handleSelect = (item: any) => {
-    if (sheetType === 'category') setCategory(item);
-    else setAccount(item);
+  // Handlers for Transfer Mode
+  const handleOpenFrom = () => {
+    setSheetType('fromAccount');
+    setSheetVisible(true);
+  };
+  const handleOpenTo = () => {
+    if (transferType === 'Pay Friend') {
+      setSheetType('friend');
+    } else {
+      setSheetType('toAccount');
+    }
+    setSheetVisible(true);
   };
 
-  const currentCategories = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const handleSelect = (item: any) => {
+    if (sheetType === 'category') setCategory(item);
+    else if (sheetType === 'account') setAccount(item);
+    else if (sheetType === 'fromAccount') setFromAccount(item);
+    else if (sheetType === 'toAccount') setToAccount(item);
+    else if (sheetType === 'friend') setFriend(item);
+  };
+
+  const isTransfer = type === 'Transfer';
   const isExpense = type === 'Expense';
+  const isIncome = type === 'Income';
+
+  // Determine Sheet Data
+  let sheetTitle = 'Select Item';
+  let sheetItems = [];
+  
+  if (sheetType === 'category') {
+    sheetTitle = 'Select Category';
+    sheetItems = type === 'Income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  } else if (sheetType === 'friend') {
+    sheetTitle = 'Select Friend';
+    sheetItems = FRIENDS;
+  } else {
+    sheetTitle = 'Select Account';
+    sheetItems = ACCOUNTS;
+    // Filter logic for Transfers (prevent same account)
+    if (sheetType === 'toAccount') {
+      sheetItems = ACCOUNTS.filter(a => a.id !== fromAccount.id);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -83,29 +133,48 @@ export default function AddTransaction() {
         <TransactionTypeToggle type={type} setType={setType} />
         
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* 2. Date & Amount (Splitwise Style) */}
+          
+          {/* 2. Amount Input (Switch Variant based on Mode) */}
           <AmountInput 
             amount={amount} 
             setAmount={setAmount} 
             currency={currency} 
             setCurrency={setCurrency} 
+            variant={isTransfer ? 'standard' : 'hero'}
           />
-          
-          {/* 3. The Split Section (Only for Expense) */}
-          {isExpense && (
-            <SplitExpenseSection amount={parseFloat(amount) || 0} />
+
+          {/* 3. Transfer Logic */}
+          {isTransfer && (
+            <>
+              <TransferTypeToggle type={transferType} setType={setTransferType} />
+              <TransferDetails 
+                transferType={transferType as any}
+                fromAccount={fromAccount.label}
+                toAccount={transferType === 'Pay Friend' ? friend.label : toAccount.label}
+                note={note}
+                setNote={setNote}
+                onSelectFrom={handleOpenFrom}
+                onSelectTo={handleOpenTo}
+              />
+            </>
           )}
 
-          {/* 4. The Details Section (Category, Account, Note) */}
-          <TransactionDetails
-            category={category.label}
-            account={account.label}
-            accountLabel={type === 'Income' ? "Deposit to" : "Account"}
-            note={note}
-            setNote={setNote}
-            onSelectCategory={handleOpenCategory}
-            onSelectAccount={handleOpenAccount}
-          />
+          {/* 4. Expense/Income Logic */}
+          {!isTransfer && (
+            <>
+              {isExpense && <SplitExpenseSection amount={parseFloat(amount) || 0} />}
+              
+              <TransactionDetails
+                category={category.label}
+                account={account.label}
+                accountLabel={isIncome ? "Deposit to" : "Account"}
+                note={note}
+                setNote={setNote}
+                onSelectCategory={handleOpenCategory}
+                onSelectAccount={handleOpenAccount}
+              />
+            </>
+          )}
           
           <View style={styles.spacer} />
         </ScrollView>
@@ -121,10 +190,16 @@ export default function AddTransaction() {
       <SelectionSheet 
         isVisible={sheetVisible} 
         onClose={() => setSheetVisible(false)}
-        title={sheetType === 'category' ? 'Select Category' : 'Select Account'}
-        items={sheetType === 'category' ? currentCategories : ACCOUNTS}
+        title={sheetTitle}
+        items={sheetItems}
         onSelect={handleSelect}
-        selectedId={sheetType === 'category' ? category.id : account.id}
+        selectedId={
+           sheetType === 'category' ? category.id : 
+           sheetType === 'account' ? account.id :
+           sheetType === 'fromAccount' ? fromAccount.id :
+           sheetType === 'toAccount' ? toAccount.id :
+           friend.id
+        }
       />
     </SafeAreaView>
   );
