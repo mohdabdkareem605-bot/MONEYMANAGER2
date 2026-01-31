@@ -116,8 +116,8 @@ export default function SplitExpenseSection({ amount }: SplitExpenseSectionProps
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 0, // Removed top margin to sit flush if needed, or controlled by parent
-    marginBottom: 16,
+    marginTop: 0,
+    marginBottom: 0, // Removed bottom margin to close the gap
     marginHorizontal: 24,
   },
   header: {
