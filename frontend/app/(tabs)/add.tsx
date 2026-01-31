@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Utensils, Coffee, Car, ShoppingBag, Banknote, CreditCard, Landmark, Plane, Home, Smartphone } from 'lucide-react-native';
-import { COLORS, RADIUS, SHADOWS } from '../../constants/theme';
+import { COLORS, RADIUS, SHADOWS } from '../../src/constants/theme';
 
 import TransactionTypeToggle from '../../src/components/add-transaction/TransactionTypeToggle';
 import AmountInput from '../../src/components/add-transaction/AmountInput';
