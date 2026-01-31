@@ -92,8 +92,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopLeftRadius: RADIUS.l,
     borderTopRightRadius: RADIUS.l,
-    paddingBottom: 40,
-    maxHeight: height * 0.6,
+    paddingBottom: 100, // Increased to clear Tab Bar
+    maxHeight: height * 0.7,
   },
   header: {
     flexDirection: 'row',
