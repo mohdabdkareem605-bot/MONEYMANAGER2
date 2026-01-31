@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { UserPlus } from 'lucide-react-native';
-import { COLORS, SHADOWS, RADIUS } from '../../constants/theme';
+import { COLORS, SHADOWS, RADIUS } from '../../src/constants/theme';
 
 import FriendsHeader from '../../src/components/friends/FriendsHeader';
 import ScopeToggle from '../../src/components/friends/ScopeToggle';
