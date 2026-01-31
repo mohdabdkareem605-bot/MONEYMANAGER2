@@ -7,6 +7,7 @@ interface TransactionDetailsProps {
   category: string;
   account: string;
   note: string;
+  accountLabel?: string;
   setNote: (text: string) => void;
   onSelectCategory: () => void;
   onSelectAccount: () => void;
@@ -16,6 +17,7 @@ export default function TransactionDetails({
   category, 
   account, 
   note, 
+  accountLabel = "Account",
   setNote, 
   onSelectCategory, 
   onSelectAccount 
@@ -42,7 +44,7 @@ export default function TransactionDetails({
           <CreditCard size={20} color={COLORS.primary} />
         </View>
         <View style={styles.textContainer}>
-          <Text style={styles.label}>Account</Text>
+          <Text style={styles.label}>{accountLabel}</Text>
           <Text style={styles.value}>{account}</Text>
         </View>
         <ChevronDown size={20} color={COLORS.textSecondary} />
