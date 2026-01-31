@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS, SPACING } from '../../constants/theme';
+import { COLORS, SPACING, RADIUS } from '../../constants/theme';
 
 interface AmountInputProps {
   amount: string;
@@ -33,21 +33,19 @@ export default function AmountInput({ amount, setAmount, currency, setCurrency }
         <Text style={styles.dateValue}>{fullDateDisplay}</Text>
       </View>
 
-      {/* Row 2: Amount */}
-      <View style={styles.amountRow}>
-        <Text style={styles.label}>Amount</Text>
-        
-        <View style={styles.inputContainer}>
-          {/* Currency Chip */}
-          <TouchableOpacity 
-            style={styles.currencyChip} 
-            onPress={handleCurrencyToggle}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.currencyText}>{currency}</Text>
-          </TouchableOpacity>
+      {/* Row 2: Splitwise Style Input */}
+      <View style={styles.inputRow}>
+        {/* Currency Button (Rounded Square) */}
+        <TouchableOpacity 
+          style={styles.currencyButton} 
+          onPress={handleCurrencyToggle}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.currencyText}>{currency}</Text>
+        </TouchableOpacity>
 
-          {/* Input */}
+        {/* Input Field with Underline */}
+        <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
             value={amount}
@@ -79,15 +77,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24, // Spacing between Date and Amount
-  },
-  amountRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 24,
   },
   label: {
-    fontSize: 16, // Medium Gray text size
+    fontSize: 16,
     color: COLORS.textSecondary,
     fontWeight: '500',
   },
@@ -96,35 +89,38 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontWeight: '700',
   },
-  inputContainer: {
+  inputRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary, // Purple underline
-    paddingBottom: 4,
-    minWidth: 140, // Ensure minimum width for the line
-    justifyContent: 'flex-end',
+    alignItems: 'flex-end', // Align to bottom to match underline
+    justifyContent: 'space-between',
   },
-  currencyChip: {
-    backgroundColor: '#E5E7EB', // Gray background
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 8,
+  currencyButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12, // Rounded Square
+    backgroundColor: '#E5E7EB', // Light Gray
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
   currencyText: {
     color: COLORS.textPrimary,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
   },
+  inputContainer: {
+    flex: 1,
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary, // Purple underline
+    paddingBottom: 8,
+  },
   input: {
-    fontSize: 32, // Large Bold Text
+    fontSize: 36, // Large Bold Text
     fontWeight: '700',
     color: COLORS.textPrimary,
-    textAlign: 'right',
+    textAlign: 'right', // Align number to right
     padding: 0,
     includeFontPadding: false,
-    minWidth: 50,
   },
   rateRow: {
     flexDirection: 'row',
