@@ -1,71 +1,46 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, Text } from 'react-native';
+import { View, StyleSheet, FlatList, Text } from 'react-native';
 import { COLORS } from '../../src/constants/theme';
 
 import DashboardHeader from '../../src/components/dashboard/DashboardHeader';
-import PendingCollections from '../../src/components/dashboard/PendingCollections';
-import RecentTransactionCard from '../../src/components/dashboard/RecentTransactionCard';
+import CategoryExpenseCard from '../../src/components/dashboard/CategoryExpenseCard';
 
-const RECENT_TRANSACTIONS = [
-  { 
-    id: '1', 
-    title: 'Sushi with Bob', 
-    date: 'Today, 12:30 PM', 
-    amount: '200', 
-    type: 'physical', 
-    category: 'Food', 
-    splitInfo: 'Lent AED 100',
-    isPositive: false 
-  },
-  { 
-    id: '2', 
-    title: 'Uber to Work', 
-    date: 'Yesterday, 8:45 AM', 
-    amount: '45', 
-    type: 'physical', 
-    category: 'Transport', 
-    isPositive: false 
-  },
-  { 
-    id: '3', 
-    title: 'Movie Tickets', 
-    date: 'Jan 28, 7:00 PM', 
-    amount: '120', 
-    type: 'physical', 
-    category: 'Social', 
-    splitInfo: 'Lent AED 60',
-    isPositive: false 
-  },
-  { 
-    id: '4', 
-    title: 'Grocery Run', 
-    date: 'Jan 27, 5:15 PM', 
-    amount: '350', 
-    type: 'physical', 
-    category: 'Shopping', 
-    isPositive: false 
-  },
+const CATEGORY_DATA = [
+  { id: '1', category: 'Food & Dining', count: 12, amount: '450.00', percent: 0.4 },
+  { id: '2', category: 'Transport', count: 5, amount: '120.50', percent: 0.15 },
+  { id: '3', category: 'Shopping', count: 3, amount: '340.00', percent: 0.25 },
+  { id: '4', category: 'Home', count: 2, amount: '850.00', percent: 0.6 },
+  { id: '5', category: 'Social', count: 8, amount: '210.00', percent: 0.2 },
+  { id: '6', category: 'Travel', count: 1, amount: '1,200.00', percent: 0.8 },
 ];
 
 export default function Dashboard() {
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <FlatList
+        data={CATEGORY_DATA}
+        keyExtractor={(item) => item.id}
+        
+        // Header Component (Purple + Summary Card)
+        ListHeaderComponent={
+          <>
+            <DashboardHeader />
+            <Text style={styles.sectionTitle}>Expenses by Category</Text>
+          </>
+        }
+        
+        renderItem={({ item }) => (
+          <CategoryExpenseCard 
+            category={item.category}
+            count={item.count}
+            amount={item.amount}
+            percent={item.percent}
+          />
+        )}
+        
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-      >
-        <DashboardHeader />
-        
-        <PendingCollections />
-        
-        <View style={styles.listContainer}>
-          <Text style={styles.sectionTitle}>Recent Activity</Text>
-          {RECENT_TRANSACTIONS.map((item) => (
-            <RecentTransactionCard key={item.id} item={item as any} />
-          ))}
-        </View>
-
-      </ScrollView>
+      />
     </View>
   );
 }
@@ -78,14 +53,12 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100, // Bottom Nav Space
   },
-  listContainer: {
-    marginTop: 24,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.textPrimary,
     marginLeft: 24,
     marginBottom: 16,
+    marginTop: 8,
   },
 });

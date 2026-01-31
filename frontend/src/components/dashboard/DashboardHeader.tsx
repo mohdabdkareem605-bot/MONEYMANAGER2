@@ -1,94 +1,128 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../constants/theme';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
 
 const { height } = Dimensions.get('window');
 
 export default function DashboardHeader() {
   return (
     <View style={styles.container}>
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <View style={styles.content}>
-          <Text style={styles.label}>Total Net Worth</Text>
-          <Text style={styles.heroValue}>AED 12,450.00</Text>
-          
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Cash Available</Text>
-              <Text style={styles.statValue}>AED 8,200</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Owed to you</Text>
-              <Text style={[styles.statValue, styles.boldValue]}>AED 4,250</Text>
-            </View>
+      <View style={styles.purpleBackground}>
+        <SafeAreaView edges={['top']} style={styles.safeArea}>
+          {/* Month Selector */}
+          <View style={styles.monthSelector}>
+            <TouchableOpacity style={styles.iconButton}>
+              <ChevronLeft size={24} color={COLORS.white} />
+            </TouchableOpacity>
+            
+            <Text style={styles.monthText}>January 2025</Text>
+            
+            <TouchableOpacity style={styles.iconButton}>
+              <ChevronRight size={24} color={COLORS.white} />
+            </TouchableOpacity>
           </View>
+        </SafeAreaView>
+      </View>
+
+      {/* Floating Summary Card */}
+      <View style={styles.summaryCard}>
+        {/* Income */}
+        <View style={styles.column}>
+          <Text style={styles.label}>Income</Text>
+          <Text style={[styles.value, styles.incomeValue]}>$5,000</Text>
         </View>
-      </SafeAreaView>
+        
+        <View style={styles.divider} />
+        
+        {/* Expenses */}
+        <View style={styles.column}>
+          <Text style={styles.label}>Expenses</Text>
+          <Text style={[styles.value, styles.expenseValue]}>$2,800</Text>
+        </View>
+        
+        <View style={styles.divider} />
+        
+        {/* Balance */}
+        <View style={styles.column}>
+          <Text style={styles.label}>Balance</Text>
+          <Text style={[styles.value, styles.balanceValue]}>$2,200</Text>
+        </View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    marginBottom: 60, // Space for the floating card to overlap content
+  },
+  purpleBackground: {
     backgroundColor: COLORS.primary,
-    height: height * 0.35,
+    height: height * 0.25, // Top 25-30%
     borderBottomLeftRadius: 40,
     borderBottomRightRadius: 40,
     width: '100%',
+    alignItems: 'center',
   },
   safeArea: {
-    flex: 1,
+    width: '100%',
   },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    paddingTop: SPACING.l,
-    paddingHorizontal: SPACING.l,
-  },
-  label: {
-    fontSize: 14,
-    color: COLORS.white,
-    opacity: 0.8,
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  heroValue: {
-    fontSize: 40,
-    fontWeight: '800', // Extra Bold
-    color: COLORS.white,
-    marginBottom: 24,
-  },
-  statsRow: {
+  monthSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)', // Glass effect
-    borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    justifyContent: 'center',
+    marginTop: SPACING.m,
   },
-  statItem: {
+  monthText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginHorizontal: SPACING.l,
+  },
+  iconButton: {
+    padding: 8,
+  },
+  summaryCard: {
+    position: 'absolute',
+    bottom: -50, // Floating halfway
+    left: 24,
+    right: 24,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.l, // 24px
+    paddingVertical: SPACING.l,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    ...SHADOWS.medium,
+  },
+  column: {
+    flex: 1,
     alignItems: 'center',
   },
-  statLabel: {
+  label: {
     fontSize: 12,
-    color: COLORS.white,
-    opacity: 0.8,
+    color: COLORS.textSecondary,
     marginBottom: 4,
+    fontWeight: '500',
   },
-  statValue: {
+  value: {
     fontSize: 16,
-    color: COLORS.white,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  boldValue: {
-    fontWeight: '800',
+  incomeValue: {
+    color: COLORS.success,
+  },
+  expenseValue: {
+    color: COLORS.danger,
+  },
+  balanceValue: {
+    color: COLORS.primary,
   },
   divider: {
     width: 1,
     height: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginHorizontal: 24,
+    backgroundColor: COLORS.border,
   },
 });
