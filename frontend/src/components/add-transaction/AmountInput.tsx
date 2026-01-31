@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, TextInput, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
+import { COLORS, SPACING } from '../../constants/theme';
 
 interface AmountInputProps {
   amount: string;
@@ -10,8 +10,6 @@ interface AmountInputProps {
 }
 
 export default function AmountInput({ amount, setAmount, currency, setCurrency }: AmountInputProps) {
-  const [isFocused, setIsFocused] = useState(false);
-
   // Formatted Date
   const dateStr = new Date().toLocaleDateString('en-US', {
     month: 'short',
@@ -28,18 +26,19 @@ export default function AmountInput({ amount, setAmount, currency, setCurrency }
   };
 
   return (
-    <View style={styles.card}>
+    <View style={styles.container}>
       {/* Row 1: Date */}
-      <View style={styles.row}>
+      <View style={styles.dateRow}>
         <Text style={styles.label}>Date</Text>
         <Text style={styles.dateValue}>{fullDateDisplay}</Text>
       </View>
 
       {/* Row 2: Amount */}
-      <View style={[styles.row, { marginTop: 20 }]}>
+      <View style={styles.amountRow}>
         <Text style={styles.label}>Amount</Text>
         
-        <View style={styles.amountContainer}>
+        <View style={styles.inputContainer}>
+          {/* Currency Chip */}
           <TouchableOpacity 
             style={styles.currencyChip} 
             onPress={handleCurrencyToggle}
@@ -48,21 +47,15 @@ export default function AmountInput({ amount, setAmount, currency, setCurrency }
             <Text style={styles.currencyText}>{currency}</Text>
           </TouchableOpacity>
 
-          <View style={[
-            styles.inputUnderline, 
-            { borderColor: isFocused ? COLORS.primary : COLORS.border }
-          ]}>
-            <TextInput
-              style={styles.input}
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0"
-              placeholderTextColor="#C7C7CC"
-              keyboardType="numeric"
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-            />
-          </View>
+          {/* Input */}
+          <TextInput
+            style={styles.input}
+            value={amount}
+            onChangeText={setAmount}
+            placeholder="0"
+            placeholderTextColor="#C7C7CC"
+            keyboardType="numeric"
+          />
         </View>
       </View>
 
@@ -77,57 +70,61 @@ export default function AmountInput({ amount, setAmount, currency, setCurrency }
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.l,
+  container: {
     marginHorizontal: 24,
     marginVertical: 24,
-    padding: SPACING.l,
-    ...SHADOWS.soft,
+    paddingHorizontal: SPACING.s, 
   },
-  row: {
+  dateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24, // Spacing between Date and Amount
+  },
+  amountRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   label: {
-    fontSize: 14,
+    fontSize: 16, // Medium Gray text size
     color: COLORS.textSecondary,
     fontWeight: '500',
   },
   dateValue: {
-    fontSize: 14,
+    fontSize: 16,
     color: COLORS.black,
     fontWeight: '700',
   },
-  amountContainer: {
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary, // Purple underline
+    paddingBottom: 4,
+    minWidth: 140, // Ensure minimum width for the line
+    justifyContent: 'flex-end',
   },
   currencyChip: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 12,
+    backgroundColor: '#E5E7EB', // Gray background
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
   },
   currencyText: {
-    color: COLORS.white,
+    color: COLORS.textPrimary,
     fontSize: 12,
     fontWeight: '700',
   },
-  inputUnderline: {
-    borderBottomWidth: 2,
-    paddingBottom: 4,
-    minWidth: 100,
-  },
   input: {
-    fontSize: 32,
+    fontSize: 32, // Large Bold Text
     fontWeight: '700',
     color: COLORS.textPrimary,
     textAlign: 'right',
     padding: 0,
     includeFontPadding: false,
+    minWidth: 50,
   },
   rateRow: {
     flexDirection: 'row',
