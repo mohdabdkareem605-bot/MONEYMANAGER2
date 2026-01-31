@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, Text } from 'react-native';
-import { COLORS } from '../../constants/theme';
+import { COLORS } from '../../src/constants/theme';
 
 import DashboardHeader from '../../src/components/dashboard/DashboardHeader';
 import PendingCollections from '../../src/components/dashboard/PendingCollections';
