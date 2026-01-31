@@ -77,6 +77,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
     paddingVertical: SPACING.s,
     marginBottom: 24,
+    marginTop: 16, // Added top margin for consistent spacing
     ...SHADOWS.soft,
   },
   row: {
