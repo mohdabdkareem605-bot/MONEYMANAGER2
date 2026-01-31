@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, SectionList, Text } from 'react-native';
-import { COLORS, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '../../src/constants/theme';
 
 import TransactionsHeader from '../../src/components/transactions/TransactionsHeader';
 import TransactionRow from '../../src/components/transactions/TransactionRow';
