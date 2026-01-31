@@ -10,8 +10,21 @@ interface AmountInputProps {
 }
 
 export default function AmountInput({ amount, setAmount, currency, setCurrency }: AmountInputProps) {
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
   return (
     <View style={styles.container}>
+      {/* Date Row */}
+      <Text style={styles.dateText}>{currentDate}</Text>
+
+      {/* Amount Row */}
       <View style={styles.inputWrapper}>
         <TextInput
           style={styles.input}
@@ -24,6 +37,7 @@ export default function AmountInput({ amount, setAmount, currency, setCurrency }
         />
       </View>
       
+      {/* Currency Chip */}
       <View style={styles.currencyToggle}>
         <TouchableOpacity 
           style={[styles.currencyChip, currency === 'AED' && styles.activeChip]}
@@ -46,6 +60,12 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     marginVertical: 24,
+  },
+  dateText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+    marginBottom: 8,
   },
   inputWrapper: {
     flexDirection: 'row',

@@ -6,7 +6,7 @@ import { COLORS, RADIUS, SHADOWS } from '../../src/constants/theme';
 
 import TransactionTypeToggle from '../../src/components/add-transaction/TransactionTypeToggle';
 import AmountInput from '../../src/components/add-transaction/AmountInput';
-import SelectionGrid from '../../src/components/add-transaction/SelectionGrid';
+import TransactionDetails from '../../src/components/add-transaction/TransactionDetails';
 import SplitExpenseSection from '../../src/components/add-transaction/SplitExpenseSection';
 import SelectionSheet from '../../src/components/add-transaction/SelectionSheet';
 
@@ -31,6 +31,7 @@ export default function AddTransaction() {
   const [type, setType] = useState('Expense');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<'USD' | 'AED'>('AED');
+  const [note, setNote] = useState('');
   
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [account, setAccount] = useState(ACCOUNTS[0]);
@@ -56,9 +57,11 @@ export default function AddTransaction() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.content}>
+        {/* 1. Header: Segmented Toggle */}
         <TransactionTypeToggle type={type} setType={setType} />
         
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          {/* 2. Date & Amount */}
           <AmountInput 
             amount={amount} 
             setAmount={setAmount} 
@@ -66,18 +69,23 @@ export default function AddTransaction() {
             setCurrency={setCurrency} 
           />
           
-          <SelectionGrid 
+          {/* 3. The Split Section (Directly below Amount) */}
+          <SplitExpenseSection amount={parseFloat(amount) || 0} />
+
+          {/* 4. The Details Section (Category, Account, Note) */}
+          <TransactionDetails
             category={category.label}
             account={account.label}
+            note={note}
+            setNote={setNote}
             onSelectCategory={handleOpenCategory}
             onSelectAccount={handleOpenAccount}
           />
           
-          <SplitExpenseSection amount={parseFloat(amount) || 0} />
-          
           <View style={styles.spacer} />
         </ScrollView>
 
+        {/* 5. Save Button (Docked at bottom) */}
         <View style={styles.footer}>
           <TouchableOpacity style={styles.saveBtn} activeOpacity={0.8}>
             <Text style={styles.saveBtnText}>Save Transaction</Text>

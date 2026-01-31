@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Switch, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, Switch, TouchableOpacity, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Plus, User } from 'lucide-react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
@@ -8,15 +8,18 @@ interface SplitExpenseSectionProps {
   amount: number;
 }
 
+const SPLIT_TYPES = ['Equal', 'Exact', '%'];
+
 export default function SplitExpenseSection({ amount }: SplitExpenseSectionProps) {
   const [isSplit, setIsSplit] = useState(false);
+  const [splitType, setSplitType] = useState('Equal');
   const height = useSharedValue(0);
   const opacity = useSharedValue(0);
 
   const toggleSplit = (value: boolean) => {
     setIsSplit(value);
     if (value) {
-      height.value = withTiming(280, { duration: 300 });
+      height.value = withTiming(360, { duration: 300 }); // Increased height for chips
       opacity.value = withTiming(1, { duration: 300 });
     } else {
       height.value = withTiming(0, { duration: 300 });
@@ -47,8 +50,9 @@ export default function SplitExpenseSection({ amount }: SplitExpenseSectionProps
 
       <Animated.View style={animatedStyle}>
         <View style={styles.logicalLayer}>
-          <Text style={styles.sectionLabel}>Participants</Text>
           
+          {/* Participants Row */}
+          <Text style={styles.sectionLabel}>Participants</Text>
           <View style={styles.participantsRow}>
             {/* Self */}
             <View style={styles.participant}>
@@ -70,6 +74,21 @@ export default function SplitExpenseSection({ amount }: SplitExpenseSectionProps
             <TouchableOpacity style={styles.addBtn}>
               <Plus size={20} color={COLORS.primary} />
             </TouchableOpacity>
+          </View>
+
+          {/* Split Type Chips */}
+          <View style={styles.chipRow}>
+            {SPLIT_TYPES.map((type) => (
+              <TouchableOpacity
+                key={type}
+                style={[styles.chip, splitType === type && styles.activeChip]}
+                onPress={() => setSplitType(type)}
+              >
+                <Text style={[styles.chipText, splitType === type && styles.activeChipText]}>
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
           {/* Truth Summary */}
@@ -97,7 +116,8 @@ export default function SplitExpenseSection({ amount }: SplitExpenseSectionProps
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 24,
+    marginTop: 0, // Removed top margin to sit flush if needed, or controlled by parent
+    marginBottom: 16,
     marginHorizontal: 24,
   },
   header: {
@@ -117,7 +137,6 @@ const styles = StyleSheet.create({
     padding: SPACING.m,
     marginTop: 8,
     ...SHADOWS.soft,
-    marginBottom: 20
   },
   sectionLabel: {
     fontSize: 12,
@@ -126,7 +145,7 @@ const styles = StyleSheet.create({
   },
   participantsRow: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   participant: {
     alignItems: 'center',
@@ -161,6 +180,28 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.background,
+    marginRight: 8,
+  },
+  activeChip: {
+    backgroundColor: COLORS.primary,
+  },
+  chipText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  activeChipText: {
+    color: COLORS.white,
   },
   summaryCard: {
     backgroundColor: COLORS.background,
