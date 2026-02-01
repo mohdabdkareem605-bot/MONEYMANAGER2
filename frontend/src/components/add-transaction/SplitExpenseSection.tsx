@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, Switch, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { View, Text, Switch, TouchableOpacity, StyleSheet, ScrollView, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Plus, User, Check, X } from 'lucide-react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface Friend {
   id: string;
@@ -32,39 +36,25 @@ export default function SplitExpenseSection({
   const [isSplit, setIsSplit] = useState(false);
   const [splitType, setSplitType] = useState('Equal');
   const [showFriendPicker, setShowFriendPicker] = useState(false);
-  const height = useSharedValue(0);
-  const opacity = useSharedValue(0);
 
   const toggleSplit = (value: boolean) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsSplit(value);
-    if (value) {
-      height.value = withTiming(400, { duration: 300 });
-      opacity.value = withTiming(1, { duration: 300 });
-    } else {
-      height.value = withTiming(0, { duration: 300 });
-      opacity.value = withTiming(0, { duration: 200 });
-      // Clear selections when disabling split
-      if (setSelectedFriends) setSelectedFriends([]);
+    if (!value && setSelectedFriends) {
+      setSelectedFriends([]);
     }
   };
 
   const toggleFriend = (friendId: string) => {
     if (!setSelectedFriends) return;
     
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (selectedFriends.includes(friendId)) {
       setSelectedFriends(selectedFriends.filter(id => id !== friendId));
     } else {
       setSelectedFriends([...selectedFriends, friendId]);
     }
   };
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      height: height.value,
-      opacity: opacity.value,
-      overflow: 'hidden',
-    };
-  });
 
   // Calculate split amounts
   const participantCount = selectedFriends.length + 1; // +1 for self
@@ -86,7 +76,7 @@ export default function SplitExpenseSection({
         />
       </View>
 
-      <Animated.View style={animatedStyle}>
+      {isSplit && (
         <View style={styles.logicalLayer}>
           
           {/* Participants Row */}
@@ -201,7 +191,7 @@ export default function SplitExpenseSection({
             </View>
           </View>
         </View>
-      </Animated.View>
+      )}
     </View>
   );
 }
