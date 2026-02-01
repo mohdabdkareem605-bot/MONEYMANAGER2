@@ -13,9 +13,10 @@ interface FriendCardProps {
     currency?: string;
   };
   isGroup?: boolean;
+  onLongPress?: () => void;
 }
 
-export default function FriendCard({ item, isGroup = false }: FriendCardProps) {
+export default function FriendCard({ item, isGroup = false, onLongPress }: FriendCardProps) {
   const getBalanceColor = () => {
     switch (item.status) {
       case 'owed': return COLORS.success;
@@ -33,7 +34,12 @@ export default function FriendCard({ item, isGroup = false }: FriendCardProps) {
   };
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.7}>
+    <TouchableOpacity 
+      style={styles.card} 
+      activeOpacity={0.7}
+      onLongPress={onLongPress}
+      delayLongPress={500}
+    >
       {/* Left: Avatar */}
       <View style={styles.avatar}>
         {isGroup ? (
