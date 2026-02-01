@@ -1,42 +1,113 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, SectionList, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, SectionList, Text, ActivityIndicator, RefreshControl } from 'react-native';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../../src/constants/theme';
+import { useDataStore, Transaction } from '../../src/store/dataStore';
 
 import TransactionsHeader from '../../src/components/transactions/TransactionsHeader';
 import TransactionRow from '../../src/components/transactions/TransactionRow';
 
-const DATA = [
-  {
-    title: 'Today',
-    data: [
-      { id: '1', type: 'expense', desc: 'Uber', amount: 45.00, category: 'Transport', account: 'Chase ••45', isSplit: false },
-      { id: '2', type: 'expense', desc: 'Team Lunch', amount: 240.00, category: 'Food', account: 'Chase ••45', isSplit: true, lent: 120.00 }
-    ]
-  },
-  {
-    title: 'Yesterday',
-    data: [
-      { id: '3', type: 'expense', desc: 'Grocery Run', amount: 350.00, category: 'Shopping', account: 'Visa ••12', isSplit: false },
-      { id: '4', type: 'income', desc: 'Freelance Payout', amount: 1500.00, category: 'Income', account: 'Chase ••45', isSplit: false }
-    ]
-  },
-  {
-    title: 'Mon, 27 Jan',
-    data: [
-      { id: '5', type: 'expense', desc: 'Movie Tickets', amount: 120.00, category: 'Food', account: 'Cash', isSplit: true, lent: 60.00 }
-    ]
-  }
-];
+// Helper to format date
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  if (date.toDateString() === today.toDateString()) return 'Today';
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  
+  return date.toLocaleDateString('en-US', { 
+    weekday: 'short', 
+    day: 'numeric', 
+    month: 'short' 
+  });
+};
+
+// Group transactions by date
+const groupTransactionsByDate = (transactions: Transaction[]) => {
+  const groups: Record<string, Transaction[]> = {};
+  
+  transactions.forEach(tx => {
+    const dateKey = formatDate(tx.occurred_at);
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(tx);
+  });
+  
+  return Object.entries(groups).map(([title, data]) => ({
+    title,
+    data: data.map(tx => ({
+      id: tx.id,
+      type: tx.total_amount >= 0 ? 'expense' : 'income',
+      desc: tx.description || 'Transaction',
+      amount: Math.abs(tx.total_amount),
+      category: tx.description || 'Other',
+      account: tx.account_name || 'Account',
+      isSplit: tx.splits && tx.splits.length > 0,
+      lent: tx.splits?.reduce((sum, s) => sum + (s.amount > 0 ? s.amount : 0), 0) || 0,
+    })),
+  }));
+};
 
 export default function TransactionsScreen() {
   const [activeFilter, setActiveFilter] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  const { transactions, fetchTransactions } = useDataStore();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      await fetchTransactions();
+    } catch (error) {
+      console.error('Load transactions error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // Filter and group transactions
+  const filteredTransactions = React.useMemo(() => {
+    let filtered = transactions;
+    
+    if (activeFilter === 'Expenses') {
+      filtered = transactions.filter(t => t.total_amount > 0);
+    } else if (activeFilter === 'Income') {
+      filtered = transactions.filter(t => t.total_amount < 0);
+    } else if (activeFilter === 'Split') {
+      filtered = transactions.filter(t => t.splits && t.splits.length > 0);
+    }
+    
+    return groupTransactionsByDate(filtered);
+  }, [transactions, activeFilter]);
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading transactions...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <TransactionsHeader activeFilter={activeFilter} setActiveFilter={setActiveFilter} />
       
       <SectionList
-        sections={DATA as any}
+        sections={filteredTransactions as any}
         keyExtractor={(item) => item.id}
         
         renderSectionHeader={({ section: { title } }) => (
@@ -44,30 +115,38 @@ export default function TransactionsScreen() {
         )}
         
         renderItem={({ item, index, section }) => (
-          // Group logic: Wrap all items of a section in one card visually?
-          // SectionList renders item by item. To wrap them in a single card per section, 
-          // we usually style the first and last item or the container. 
-          // Better approach for "iPhone Settings" style: 
-          // The renderItem is just the row. The visual "Card" effect is achieved by styling the first/last items 
-          // or putting a container around the item but that breaks the connected card look.
-          
-          // Strategy: The SectionList container style can't do this easily per section.
-          // Instead, we style each row with a white background.
-          // Top row gets top-radius. Bottom row gets bottom-radius.
-          
           <View style={[
             styles.itemContainer,
             index === 0 && styles.firstItem,
             index === section.data.length - 1 && styles.lastItem,
-            // If it's a single item, it needs both
           ]}>
              <TransactionRow item={item} isLast={index === section.data.length - 1} />
           </View>
         )}
         
-        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No transactions yet</Text>
+            <Text style={styles.emptySubtext}>
+              Tap the + button to add your first transaction
+            </Text>
+          </View>
+        }
+        
+        contentContainerStyle={[
+          styles.listContent,
+          filteredTransactions.length === 0 && styles.emptyListContent,
+        ]}
         showsVerticalScrollIndicator={false}
-        stickySectionHeadersEnabled={false} // Clean look
+        stickySectionHeadersEnabled={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
       />
     </View>
   );
@@ -78,10 +157,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listContent: {
-    paddingBottom: 100, // Bottom Nav
+    paddingBottom: 100,
     paddingHorizontal: SPACING.l,
     paddingTop: SPACING.m,
+    flexGrow: 1,
+  },
+  emptyListContent: {
+    justifyContent: 'center',
   },
   sectionHeader: {
     fontSize: 14,
@@ -91,10 +178,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginLeft: 4,
   },
-  // Card Group Styling
   itemContainer: {
     backgroundColor: COLORS.white,
-    paddingHorizontal: 0, // Inner padding handles it
+    paddingHorizontal: 0,
     ...SHADOWS.soft,
   },
   firstItem: {
@@ -104,6 +190,27 @@ const styles = StyleSheet.create({
   lastItem: {
     borderBottomLeftRadius: RADIUS.l,
     borderBottomRightRadius: RADIUS.l,
-    marginBottom: 8, // Space after the card
+    marginBottom: 8,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });
