@@ -3,10 +3,24 @@ import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
+import type { DashboardSummary } from '../../store/dataStore';
 
 const { height } = Dimensions.get('window');
 
-export default function DashboardHeader() {
+interface Props {
+  summary?: DashboardSummary | null;
+}
+
+export default function DashboardHeader({ summary }: Props) {
+  const formatAmount = (amount: number) => {
+    return `$${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const currentMonth = new Date().toLocaleDateString('en-US', { 
+    month: 'long', 
+    year: 'numeric' 
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.purpleBackground}>
@@ -17,7 +31,7 @@ export default function DashboardHeader() {
               <ChevronLeft size={24} color={COLORS.white} />
             </TouchableOpacity>
             
-            <Text style={styles.monthText}>January 2025</Text>
+            <Text style={styles.monthText}>{currentMonth}</Text>
             
             <TouchableOpacity style={styles.iconButton}>
               <ChevronRight size={24} color={COLORS.white} />
@@ -28,26 +42,35 @@ export default function DashboardHeader() {
 
       {/* Floating Summary Card */}
       <View style={styles.summaryCard}>
-        {/* Income */}
+        {/* Owed to You */}
         <View style={styles.column}>
-          <Text style={styles.label}>Income</Text>
-          <Text style={[styles.value, styles.incomeValue]}>$5,000</Text>
+          <Text style={styles.label}>Owed to You</Text>
+          <Text style={[styles.value, styles.incomeValue]}>
+            {formatAmount(summary?.total_owed_to_you || 0)}
+          </Text>
         </View>
         
         <View style={styles.divider} />
         
-        {/* Expenses */}
+        {/* You Owe */}
         <View style={styles.column}>
-          <Text style={styles.label}>Expenses</Text>
-          <Text style={[styles.value, styles.expenseValue]}>$2,800</Text>
+          <Text style={styles.label}>You Owe</Text>
+          <Text style={[styles.value, styles.expenseValue]}>
+            {formatAmount(summary?.total_you_owe || 0)}
+          </Text>
         </View>
         
         <View style={styles.divider} />
         
-        {/* Balance */}
+        {/* Net Balance */}
         <View style={styles.column}>
-          <Text style={styles.label}>Balance</Text>
-          <Text style={[styles.value, styles.balanceValue]}>$2,200</Text>
+          <Text style={styles.label}>Net Balance</Text>
+          <Text style={[
+            styles.value, 
+            (summary?.net_balance || 0) >= 0 ? styles.balanceValue : styles.expenseValue
+          ]}>
+            {formatAmount(summary?.net_balance || 0)}
+          </Text>
         </View>
       </View>
     </View>
