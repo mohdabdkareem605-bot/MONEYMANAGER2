@@ -1,11 +1,10 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
 import { COLORS, SHADOWS, RADIUS } from '../../constants/theme';
 
 const OPTIONS = ['Income', 'Expense', 'Transfer'];
 const { width } = Dimensions.get('window');
-const TOGGLE_WIDTH = width - 48; // Padding on screen
+const TOGGLE_WIDTH = width - 48;
 const TAB_WIDTH = TOGGLE_WIDTH / 3;
 
 interface TransactionTypeToggleProps {
@@ -14,22 +13,11 @@ interface TransactionTypeToggleProps {
 }
 
 export default function TransactionTypeToggle({ type, setType }: TransactionTypeToggleProps) {
-  const translateX = useSharedValue(0);
-
-  useEffect(() => {
-    const index = OPTIONS.indexOf(type);
-    translateX.value = withSpring(index * TAB_WIDTH, { damping: 15, stiffness: 150 });
-  }, [type]);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
-    };
-  });
+  const activeIndex = OPTIONS.indexOf(type);
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.activePill, animatedStyle]} />
+      <View style={[styles.activePill, { left: activeIndex * TAB_WIDTH }]} />
       {OPTIONS.map((option) => (
         <TouchableOpacity
           key={option}
@@ -65,7 +53,6 @@ const styles = StyleSheet.create({
     width: TAB_WIDTH,
     height: 40,
     top: 4,
-    left: 0,
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.l - 4,
     shadowColor: "#000",
