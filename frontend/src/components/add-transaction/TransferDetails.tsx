@@ -1,28 +1,32 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
-import { CreditCard, ChevronDown, User, ArrowDown } from 'lucide-react-native';
+import { CreditCard, ChevronDown, User, ArrowDown, Tag } from 'lucide-react-native';
 import { COLORS, SHADOWS, RADIUS, SPACING } from '../../constants/theme';
 
 interface TransferDetailsProps {
   transferType: 'Internal Transfer' | 'Pay Friend';
   fromAccount: string;
   toAccount: string; // Or Friend Name
+  reason?: string;
   note: string;
   setNote: (text: string) => void;
   onSelectFrom: () => void;
   onSelectTo: () => void;
+  onSelectReason?: () => void;
 }
 
-export default function TransferDetails({ 
+export default function TransferDetails({
   transferType,
   fromAccount,
   toAccount,
+  reason,
   note,
   setNote,
   onSelectFrom,
-  onSelectTo 
+  onSelectTo,
+  onSelectReason
 }: TransferDetailsProps) {
-  
+
   const isPayFriend = transferType === 'Pay Friend';
 
   return (
@@ -30,7 +34,7 @@ export default function TransferDetails({
       {/* Visual Connector Line */}
       <View style={styles.connectorLine} />
       <View style={styles.connectorArrow}>
-         <ArrowDown size={12} color={COLORS.primary} />
+        <ArrowDown size={12} color={COLORS.primary} />
       </View>
 
       {/* FROM Row */}
@@ -51,9 +55,9 @@ export default function TransferDetails({
       <TouchableOpacity style={styles.row} onPress={onSelectTo}>
         <View style={styles.iconContainer}>
           {isPayFriend ? (
-             <User size={20} color={COLORS.primary} />
+            <User size={20} color={COLORS.primary} />
           ) : (
-             <CreditCard size={20} color={COLORS.primary} />
+            <CreditCard size={20} color={COLORS.primary} />
           )}
         </View>
         <View style={styles.textContainer}>
@@ -65,9 +69,26 @@ export default function TransferDetails({
 
       <View style={styles.divider} />
 
+      {/* Reason Row (Only for Pay Friend) */}
+      {isPayFriend && (
+        <>
+          <TouchableOpacity style={styles.row} onPress={onSelectReason}>
+            <View style={styles.iconContainer}>
+              <Tag size={20} color={COLORS.primary} />
+            </View>
+            <View style={styles.textContainer}>
+              <Text style={styles.label}>Reason</Text>
+              <Text style={styles.value}>{reason || 'Select Reason'}</Text>
+            </View>
+            <ChevronDown size={20} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+          <View style={styles.divider} />
+        </>
+      )}
+
       {/* Note Row */}
       <View style={styles.row}>
-        <View style={[styles.iconContainer, { backgroundColor: 'transparent' }]} /> 
+        <View style={[styles.iconContainer, { backgroundColor: 'transparent' }]} />
         <View style={styles.textContainer}>
           <TextInput
             style={styles.input}
@@ -130,7 +151,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: COLORS.background,
-    marginLeft: 72, 
+    marginLeft: 72,
   },
   // Connector Visuals
   connectorLine: {

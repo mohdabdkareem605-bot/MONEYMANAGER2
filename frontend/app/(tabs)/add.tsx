@@ -14,6 +14,7 @@ import {
   Landmark, Plane, Home, Smartphone, Briefcase, Gift, Coins, User
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { supabase } from '../../src/lib/supabase';
 import { COLORS, RADIUS, SHADOWS } from '../../src/constants/theme';
 import { useDataStore } from '../../src/store/dataStore';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -67,6 +68,12 @@ const DEFAULT_ACCOUNTS = [
   { id: 'default-bank', label: 'Bank Account', icon: Landmark },
 ];
 
+const REASON_OPTIONS = [
+  { id: 'Lend', label: 'Lend', icon: Banknote },
+  { id: 'Payment', label: 'Payment', icon: CreditCard },
+  { id: 'Gift', label: 'Gift', icon: Gift },
+];
+
 export default function AddTransaction() {
   const router = useRouter();
   const { user } = useAuth();
@@ -99,13 +106,14 @@ export default function AddTransaction() {
   const [fromAccount, setFromAccount] = useState(DEFAULT_ACCOUNTS[0]);
   const [toAccount, setToAccount] = useState(DEFAULT_ACCOUNTS[1]);
   const [friend, setFriend] = useState<any>(null);
+  const [reason, setReason] = useState('Lend');
 
   // Split with friends
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [splitAmounts, setSplitAmounts] = useState<Record<string, number>>({});
 
   const [sheetVisible, setSheetVisible] = useState(false);
-  const [sheetType, setSheetType] = useState<'category' | 'account' | 'fromAccount' | 'toAccount' | 'friend'>('category');
+  const [sheetType, setSheetType] = useState<'category' | 'account' | 'fromAccount' | 'toAccount' | 'friend' | 'reason'>('category');
 
   // Add Account Modal State
   const [showAddAccountModal, setShowAddAccountModal] = useState(false);
@@ -148,6 +156,7 @@ export default function AddTransaction() {
       id: contact.id,
       label: contact.name,
       icon: User,
+      linked_profile_id: contact.linked_profile_id,
     }));
   }, [contacts]);
 
@@ -205,12 +214,18 @@ export default function AddTransaction() {
     setSheetVisible(true);
   };
 
+  const handleOpenReason = () => {
+    setSheetType('reason');
+    setSheetVisible(true);
+  };
+
   const handleSelect = (item: any) => {
     if (sheetType === 'category') setCategory(item);
     else if (sheetType === 'account') setAccount(item);
     else if (sheetType === 'fromAccount') setFromAccount(item);
     else if (sheetType === 'toAccount') setToAccount(item);
     else if (sheetType === 'friend') setFriend(item);
+    else if (sheetType === 'reason') setReason(item.id);
   };
 
   // Handle adding new account via modal
@@ -293,6 +308,9 @@ export default function AddTransaction() {
   } else if (sheetType === 'friend') {
     sheetTitle = 'Select Friend';
     sheetItems = mappedFriends;
+  } else if (sheetType === 'reason') {
+    sheetTitle = 'Select Reason';
+    sheetItems = REASON_OPTIONS;
   } else {
     sheetTitle = 'Select Account';
     sheetItems = mappedAccounts;
@@ -313,49 +331,168 @@ export default function AddTransaction() {
     setSaving(true);
     try {
       // Check if account exists, create if using default
-      let accountId = account.id;
+      let accountId = fromAccount.id; // Default source for Transfer is "From"
+
+      // For Expense/Income, source is "account"
+      if (!isTransfer) {
+        accountId = account.id;
+      }
+
+      // Handle Default Account Creation
       if (accountId.startsWith('default-')) {
-        // Create the account first
+        const accLabel = isTransfer ? fromAccount.label : account.label;
         const newAccount = await createAccount({
-          name: account.label,
+          name: accLabel,
           currency_code: currency,
           current_balance: 0,
         });
         if (newAccount) {
           accountId = newAccount.id;
         } else {
-          throw new Error('Failed to create account');
+          throw new Error('Failed to create source account');
         }
       }
 
-      // Build splits from selected friends (ONLY FOR EXPENSE)
-      // Handle reverse contacts by stripping the "reverse_" prefix for database operations
-      let splits: any[] = [];
+      // --- HEURISTIC: Select Destination Account if Needed ---
+      const getBestDestinationAccount = (txCurrency: string) => {
+        // 1. Try to find accounts with matching currency
+        const matchingAccounts = accounts.filter(a => a.currency_code === txCurrency);
 
-      if (type === 'Expense') {
-        splits = selectedFriends.map(friendId => {
-          const splitAmount = splitAmounts[friendId] || (amountNum / (selectedFriends.length + 1));
-          // Strip reverse_ prefix if present - reverse contacts are virtual IDs not valid in DB
-          const actualContactId = friendId.startsWith('reverse_')
-            ? friendId.replace('reverse_', '')
-            : friendId;
-          return {
-            contact_id: actualContactId,
-            amount: splitAmount, // Positive = they owe me
-          };
-        });
+        if (matchingAccounts.length > 0) {
+          // Return the one with highest balance
+          return matchingAccounts.sort((a, b) => b.current_balance - a.current_balance)[0].id;
+        }
+
+        // 2. Fallback: Return account with highest balance overall (Proxy for Main Account)
+        if (accounts.length > 0) {
+          return accounts.sort((a, b) => b.current_balance - a.current_balance)[0].id;
+        }
+        return undefined;
+      };
+
+      let destinationAccountId: string | undefined = undefined;
+      let receiverContactId: string | undefined = undefined;
+
+      // Auto-select destination for incoming flows if not set
+      // (This serves as a default if logic below doesn't override it)
+      const heuristicDestId = getBestDestinationAccount(currency);
+
+      let transactionType: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'SETTLEMENT' = type.toUpperCase() as any;
+      let splits: any[] = [];
+      let finalDescription = note;
+
+      // --- LOGIC MAPPING ---
+      if (isTransfer) {
+
+        if (transferType === 'Internal Transfer') {
+          // *** INTERNAL TRANSFER ***
+          transactionType = 'TRANSFER';
+
+          let toAccId = toAccount.id;
+          if (toAccId.startsWith('default-')) {
+            const newToAccount = await createAccount({
+              name: toAccount.label,
+              currency_code: currency, // Assume same currency for default creation? Or default USD?
+              current_balance: 0
+            });
+            if (newToAccount) toAccId = newToAccount.id;
+            else throw new Error("Failed to create destination account");
+          }
+          destinationAccountId = toAccId;
+          if (!finalDescription) finalDescription = `Transfer to ${toAccount.label}`;
+
+        } else if (transferType === 'Pay Friend') {
+          // *** PAY FRIEND ***
+          if (!friend) throw new Error("Please select a friend");
+
+          // Handle reverse contact ID for Friend -> Real ID
+          const friendRealId = friend.id.startsWith('reverse_') ? friend.id.replace('reverse_', '') : friend.id;
+
+          // --- SECURE CROSS-USER LOOKUP ---
+          // If friend is a real user (has linked_profile_id), try to find their destination account
+          if (friend.linked_profile_id) {
+            try {
+              const { data: friendAccountId, error: rpcError } = await supabase.rpc('get_user_destination_account', {
+                target_user_id: friend.linked_profile_id,
+                target_currency: currency
+              });
+
+              if (!rpcError && friendAccountId) {
+                destinationAccountId = friendAccountId;
+              }
+            } catch (err) {
+              console.log("Failed to fetch friend's account (non-blocking)", err);
+            }
+          }
+
+          if (reason === 'Lend') {
+            // LENDING -> TRANSFER + DEBT SPLIT
+            transactionType = 'TRANSFER';
+            splits.push({
+              contact_id: friendRealId,
+              amount: amountNum,
+              split_type: 'DEBT'
+            });
+            // Also link the contact to the main transaction for traceability
+            receiverContactId = friendRealId;
+
+            if (!finalDescription) finalDescription = "Lend";
+
+          } else if (reason === 'Payment') {
+            // REPAYMENT -> SETTLEMENT
+            transactionType = 'SETTLEMENT';
+            receiverContactId = friendRealId;
+
+            // Repayment implies I am paying them, so money leaves my account (Source).
+            // Destination is technically 'them', handled by Settlement logic.
+            // BUT if this was a "Received Payment" (Reverse), we'd need destination.
+
+            // For completeness, if we ever support "Receive Payment from Friend":
+            // destinationAccountId = heuristicDestId; 
+
+            if (!finalDescription) finalDescription = "Payment";
+
+          } else if (reason === 'Gift') {
+            // GIFT -> EXPENSE (No split, I pay)
+            transactionType = 'EXPENSE';
+            if (!finalDescription) finalDescription = "Gift";
+            // No splits = My Expense
+          }
+        }
+
+      } else {
+        // --- STANDARD EXPENSE / INCOME ---
+
+        // Build splits from selected friends (ONLY FOR EXPENSE)
+        if (type === 'Expense') {
+          // ... (Existing Split Logic)
+          if (selectedFriends.length > 0) {
+            splits = selectedFriends.map(friendId => {
+              const splitAmount = splitAmounts[friendId] || (amountNum / (selectedFriends.length + 1));
+              const actualContactId = friendId.startsWith('reverse_')
+                ? friendId.replace('reverse_', '')
+                : friendId;
+              return {
+                contact_id: actualContactId,
+                amount: splitAmount,
+                split_type: 'DEBT' // Default to DEBT for expense splits
+              };
+            });
+          }
+        }
       }
 
       // Create transaction
-      // Helper to check if a string is a valid UUID
       const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
       const transaction = await createTransaction({
         account_id: accountId,
+        destination_account_id: destinationAccountId, // NEW
+        receiver_contact_id: receiverContactId, // NEW
         total_amount: amountNum,
         currency_code: currency,
-        description: note || category.label,
-        transaction_type: type.toUpperCase() as 'INCOME' | 'EXPENSE' | 'TRANSFER',
+        description: finalDescription || category.label,
+        transaction_type: transactionType as any,
         category_id: isValidUUID(category.id) ? category.id : undefined,
         splits,
       });
@@ -401,10 +538,12 @@ export default function AddTransaction() {
                 transferType={transferType as any}
                 fromAccount={fromAccount.label}
                 toAccount={transferType === 'Pay Friend' ? (friend?.label || 'Select Friend') : toAccount.label}
+                reason={reason}
                 note={note}
                 setNote={setNote}
                 onSelectFrom={handleOpenFrom}
                 onSelectTo={handleOpenTo}
+                onSelectReason={handleOpenReason}
               />
             </>
           )}
@@ -466,7 +605,8 @@ export default function AddTransaction() {
             sheetType === 'account' ? account.id :
               sheetType === 'fromAccount' ? fromAccount.id :
                 sheetType === 'toAccount' ? toAccount.id :
-                  friend?.id
+                  sheetType === 'reason' ? reason :
+                    friend?.id
         }
         allowAdd={sheetType === 'account' || sheetType === 'fromAccount' || sheetType === 'toAccount'}
         allowEdit={sheetType === 'account' || sheetType === 'fromAccount' || sheetType === 'toAccount'}

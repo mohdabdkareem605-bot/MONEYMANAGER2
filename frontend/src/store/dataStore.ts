@@ -143,9 +143,11 @@ interface DataState {
     total_amount: number;
     currency_code: string;
     description?: string;
-    transaction_type: 'INCOME' | 'EXPENSE' | 'TRANSFER';
+    transaction_type: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'SETTLEMENT';
     category_id?: string;
-    splits: { contact_id: string; amount: number }[];
+    splits: { contact_id: string; amount: number; split_type?: 'DEBT' | 'PAYMENT' }[];
+    destination_account_id?: string;
+    receiver_contact_id?: string;
   }) => Promise<Transaction | null>;
 
   fetchCategories: () => Promise<void>;
@@ -157,7 +159,8 @@ interface DataState {
     amount: number;
     account_id: string;
     direction: 'you_pay' | 'they_pay';
-  }) => Promise<void>;
+
+  }) => Promise<Transaction | null>;
 
   getSettlementPreview: (data: {
     contact_id: string;
@@ -459,10 +462,18 @@ export const useDataStore = create<DataState>((set, get) => ({
         account_id: txData.account_id,
         total_amount: txData.total_amount,
         currency_code: txData.currency_code,
-        description: txData.description,
         transaction_type: txData.transaction_type,
-        category_id: txData.category_id,
       }, null, 2));
+
+      // *** DELEGATE SETTLEMENTS ***
+      if (txData.transaction_type === 'SETTLEMENT') {
+        return await get().createSettlement({
+          contact_id: txData.receiver_contact_id || txData.payer_contact_id || '',
+          amount: txData.total_amount,
+          account_id: txData.account_id!,
+          direction: txData.receiver_contact_id ? 'you_pay' : 'they_pay',
+        });
+      }
 
       // Create transaction (note: category_id column doesn't exist yet, storing category name in description)
       const { data: transaction, error: txError } = await supabase
@@ -477,6 +488,8 @@ export const useDataStore = create<DataState>((set, get) => ({
           description: txData.description,
           transaction_type: txData.transaction_type,
           category_id: txData.category_id,
+          destination_account_id: txData.destination_account_id,
+          receiver_contact_id: txData.receiver_contact_id,
         })
         .select()
         .single();
@@ -560,30 +573,9 @@ export const useDataStore = create<DataState>((set, get) => ({
       }
 
       // Update account balance based on transaction type
-      if (txData.account_id) {
-        const account = get().accounts.find(a => a.id === txData.account_id);
-        if (account) {
-          // Income ADDS to balance, Expense SUBTRACTS from balance
+      // Balance updates are now handled by database trigger 'on_transaction_created'
 
-          let amountInAccountCurrency = txData.total_amount;
-          const accountCurrency = account.currency_code || 'USD';
-          const txCurrency = txData.currency_code || 'USD';
 
-          if (txCurrency !== accountCurrency) {
-            amountInAccountCurrency = convertCurrency(txData.total_amount, txCurrency, accountCurrency);
-          }
-
-          const balanceChange = txData.transaction_type === 'INCOME'
-            ? amountInAccountCurrency
-            : -amountInAccountCurrency;
-
-          const newBalance = account.current_balance + balanceChange;
-          await supabase
-            .from('accounts')
-            .update({ current_balance: newBalance })
-            .eq('id', txData.account_id);
-        }
-      }
 
       // Refresh data
       await get().fetchTransactions();
@@ -596,6 +588,8 @@ export const useDataStore = create<DataState>((set, get) => ({
       return null;
     }
   },
+
+
 
   fetchCategories: async () => {
     try {
@@ -1414,8 +1408,10 @@ export const useDataStore = create<DataState>((set, get) => ({
       await get().fetchContactBalances();
       await get().fetchDashboard();
 
+      return transaction; // Return the created transaction
     } catch (error) {
       console.error('Create settlement error:', error);
+      return null;
     }
   },
 }));

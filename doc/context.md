@@ -1,6 +1,6 @@
 # FinanceFlow - Project Context
 
-**Last Updated:** February 5, 2026
+**Last Updated:** February 8, 2026
 
 ---
 
@@ -161,6 +161,19 @@ All tables with RLS policies:
 **Files:**
 - `/frontend/src/store/dataStore.ts` (`createSettlement`, `fetchContactBalances`)
 - `/frontend/src/components/friends/SettleUpModal.tsx`
+
+### ✅ Transfer & Lending (Feb 7-8, 2026)
+- **Smart Logic:** "Transfer" now asks for context: Lend, Repayment, or Gift.
+- **Backend Triggers:** Automatic balance updates for *all* involved parties (even cross-user) via secure database triggers.
+- **Heuristic Engine:** Auto-selects destination accounts based on currency match and balance volume.
+- **Cross-User Account Lookup:** Securely finds friend's bank account ID for repayments without exposing private data.
+- **Data Integrity:** Removed fragile client-side balance math; now relies 100% on backend logic.
+
+**Files:**
+- `/frontend/app/(tabs)/add.tsx` (Logic mapping)
+- `get_user_destination_account` (RPC Function)
+- `handle_transaction_balance_update` (DB Trigger)
+
 ---
 
 ## Not Yet Implemented
@@ -231,15 +244,12 @@ Access via:
 ---
 
 ## Next Steps / Known Issues
-**Focus:** Transfer Implementation (Currently Broken)
+**Focus:** Groups Management & Offline Support
 
-### 1. Transfer Feature Gaps
-- **Frontend Bug**: `AddTransaction.tsx` collects destination data (To Account/Friend) but **fails to send it** to the backend.
-- **Backend Bug**: `createTransaction` treats Transfers as Expenses (deducts source, ignores destination). Money effectively disappears.
-- **Missing UI**: No option to specify **Transfer Context** (e.g., "Loan", "Debt Repayment", "Gift").
-- **Missing Logic**: "Pay Friend" transfers are not integrating with the Settlement system.
+### 1. Groups (Planned)
+- Create groups for trips/events.
+- Split expenses among M users.
 
-### 2. Required Actions
-- Refactor `createTransaction` to handle `destination_account_id` and `receiver_contact_id`.
-- Update `AddTransaction.tsx` payload construction.
-- Add UI for Transfer Context (Loan vs Debt vs General).
+### 2. Offline Mode (Planned)
+- Queue creation/edits when offline.
+- Sync when online.

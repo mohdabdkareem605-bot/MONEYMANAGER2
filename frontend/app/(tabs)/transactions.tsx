@@ -41,7 +41,12 @@ const groupTransactionsByDate = (transactions: Transaction[]) => {
       // Calculate net amount (User's share)
       // Total - Splits (Debt)
       const debtAmount = tx.splits?.reduce((sum, s) => sum + (s.amount > 0 ? s.amount : 0), 0) || 0;
-      const netAmount = Math.abs(tx.total_amount) - debtAmount;
+
+      // Only subtract debt for Shared Expenses. 
+      // For Transfers (Lend) and Settlements, we want to see the full cash flow amount.
+      const netAmount = tx.transaction_type === 'EXPENSE'
+        ? Math.abs(tx.total_amount) - debtAmount
+        : Math.abs(tx.total_amount);
 
       return {
         id: tx.id,
