@@ -1,12 +1,11 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated } from 'react-native';
 import { COLORS, RADIUS, SHADOWS } from '../../constants/theme';
 
 const OPTIONS = ['Friends', 'Groups'];
 const { width } = Dimensions.get('window');
-const CONTAINER_WIDTH = width - 48; // Margin 24 * 2
-const TAB_WIDTH = (CONTAINER_WIDTH - 8) / 2; // Padding 4 * 2
+const CONTAINER_WIDTH = width - 48;
+const TAB_WIDTH = (CONTAINER_WIDTH - 8) / 2;
 
 interface ScopeToggleProps {
   mode: 'Friends' | 'Groups';
@@ -14,20 +13,21 @@ interface ScopeToggleProps {
 }
 
 export default function ScopeToggle({ mode, setMode }: ScopeToggleProps) {
-  const translateX = useSharedValue(0);
+  const translateX = useRef(new Animated.Value(0)).current;
 
-  React.useEffect(() => {
+  useEffect(() => {
     const index = OPTIONS.indexOf(mode);
-    translateX.value = withSpring(index * TAB_WIDTH, { damping: 15, stiffness: 150 });
+    Animated.spring(translateX, {
+      toValue: index * TAB_WIDTH,
+      damping: 15,
+      stiffness: 150,
+      useNativeDriver: true,
+    }).start();
   }, [mode]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
 
   return (
     <View style={styles.container}>
-      <Animated.View style={[styles.activePill, animatedStyle]} />
+      <Animated.View style={[styles.activePill, { transform: [{ translateX }] }]} />
       {OPTIONS.map((option) => {
         const isActive = mode === option;
         return (
@@ -64,12 +64,6 @@ const styles = StyleSheet.create({
     height: 40,
     top: 4,
     left: 4,
-    backgroundColor: COLORS.primary, // Purple active indicator for text color logic, but background style? 
-    // Wait, prompt said: "Pill-shaped, white background, Purple (#7C3AED) active state text/indicator."
-    // Let's invert: White background for toggle, Purple pill? Or White background, Purple Text?
-    // "Sliding segmented control... Purple active state text/indicator" usually means the pill is purple, text white.
-    // Or pill is white/light purple, text is purple.
-    // Let's go with Purple Pill, White Text for active, like the Income/Expense toggle but simpler.
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.circle,
   },

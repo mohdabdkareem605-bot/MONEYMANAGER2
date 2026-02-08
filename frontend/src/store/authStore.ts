@@ -7,11 +7,13 @@ interface AuthState {
   session: Session | null;
   loading: boolean;
   initialized: boolean;
-  
+
   // Actions
   initialize: () => Promise<void>;
   signInWithPhone: (phone: string) => Promise<{ error: Error | null }>;
   verifyOTP: (phone: string, token: string) => Promise<{ error: Error | null }>;
+  signInWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUpWithEmail: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (name: string) => Promise<void>;
 }
@@ -25,19 +27,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialize: async () => {
     try {
       set({ loading: true });
-      
+
       // Get current session
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       if (session) {
         set({ user: session.user, session });
       }
-      
+
       // Listen for auth changes
       supabase.auth.onAuthStateChange((_event, session) => {
         set({ user: session?.user || null, session });
       });
-      
+
     } catch (error) {
       console.error('Auth initialization error:', error);
     } finally {
@@ -65,11 +67,51 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         token,
         type: 'sms',
       });
-      
+
       if (data.session) {
         set({ user: data.user, session: data.session });
       }
-      
+
+      return { error: error as Error | null };
+    } catch (error) {
+      return { error: error as Error };
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  signInWithEmail: async (email: string, password: string) => {
+    try {
+      set({ loading: true });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (data.session) {
+        set({ user: data.user, session: data.session });
+      }
+
+      return { error: error as Error | null };
+    } catch (error) {
+      return { error: error as Error };
+    } finally {
+      set({ loading: false });
+    }
+  },
+
+  signUpWithEmail: async (email: string, password: string) => {
+    try {
+      set({ loading: true });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (data.session) {
+        set({ user: data.user, session: data.session });
+      }
+
       return { error: error as Error | null };
     } catch (error) {
       return { error: error as Error };
@@ -93,7 +135,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateProfile: async (name: string) => {
     const { user } = get();
     if (!user) return;
-    
+
     try {
       await supabase.from('user_profiles').upsert({
         id: user.id,

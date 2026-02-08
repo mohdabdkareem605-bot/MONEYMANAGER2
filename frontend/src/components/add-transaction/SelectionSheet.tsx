@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
-import { X } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, Animated, TextInput, Alert } from 'react-native';
+import { X, Plus, Pencil, Check } from 'lucide-react-native';
 import { COLORS, RADIUS, SPACING } from '../../constants/theme';
 
 const { height } = Dimensions.get('window');
@@ -13,64 +12,107 @@ interface SelectionSheetProps {
   items: { id: string; label: string; icon: any }[];
   onSelect: (item: any) => void;
   selectedId: string;
+  onAddNew?: () => void;  // Changed to just trigger callback (for modal)
+  onEdit?: (item: any) => void;  // Changed to trigger callback with item
+  allowAdd?: boolean;
+  allowEdit?: boolean;
+  addButtonLabel?: string;
 }
 
-export default function SelectionSheet({ isVisible, onClose, title, items, onSelect, selectedId }: SelectionSheetProps) {
-  const translateY = useSharedValue(height);
-  const opacity = useSharedValue(0);
+export default function SelectionSheet({
+  isVisible,
+  onClose,
+  title,
+  items,
+  onSelect,
+  selectedId,
+  onAddNew,
+  onEdit,
+  allowAdd = false,
+  allowEdit = false,
+  addButtonLabel = 'Add New',
+}: SelectionSheetProps) {
+  const translateY = useRef(new Animated.Value(height)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isVisible) {
-      opacity.value = withTiming(1, { duration: 200 });
-      translateY.value = withSpring(0, { damping: 15, stiffness: 150 });
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.spring(translateY, { toValue: 0, damping: 15, stiffness: 150, useNativeDriver: true }),
+      ]).start();
     } else {
-      opacity.value = withTiming(0, { duration: 200 });
-      translateY.value = withTiming(height, { duration: 300 });
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: height, duration: 300, useNativeDriver: true }),
+      ]).start();
     }
   }, [isVisible]);
 
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
-
-  if (!isVisible && opacity.value === 0) return null;
+  if (!isVisible) return null;
 
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 100 }]} pointerEvents={isVisible ? 'auto' : 'none'}>
-      <Animated.View style={[styles.overlay, overlayStyle]}>
+      <Animated.View style={[styles.overlay, { opacity }]}>
         <TouchableOpacity style={StyleSheet.absoluteFill} onPress={onClose} />
       </Animated.View>
 
-      <Animated.View style={[styles.sheet, sheetStyle]}>
+      <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <X size={20} color={COLORS.textSecondary} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {allowAdd && onAddNew && (
+              <TouchableOpacity
+                onPress={() => {
+                  onClose();
+                  setTimeout(() => onAddNew(), 100);
+                }}
+                style={styles.addHeaderBtn}
+              >
+                <Plus size={18} color={COLORS.white} />
+                <Text style={styles.addHeaderText}>{addButtonLabel}</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <X size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.grid}>
           {items.map((item) => {
             const isSelected = item.id === selectedId;
             const Icon = item.icon;
+            const isDefault = item.id.startsWith('default-') || !isNaN(Number(item.id));
+
             return (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.item, isSelected && styles.selectedItem]}
-                onPress={() => {
-                  onSelect(item);
-                  onClose();
-                }}
-              >
-                <View style={[styles.iconWrapper, isSelected && styles.selectedIconWrapper]}>
-                  <Icon size={24} color={isSelected ? COLORS.white : COLORS.primary} />
-                </View>
-                <Text style={[styles.label, isSelected && styles.selectedLabel]}>{item.label}</Text>
-              </TouchableOpacity>
+              <View key={item.id} style={styles.itemContainer}>
+                <TouchableOpacity
+                  style={[styles.item, isSelected && styles.selectedItem]}
+                  onPress={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                >
+                  <View style={[styles.iconWrapper, isSelected && styles.selectedIconWrapper]}>
+                    <Icon size={24} color={isSelected ? COLORS.white : COLORS.primary} />
+                  </View>
+                  <Text style={[styles.label, isSelected && styles.selectedLabel]}>{item.label}</Text>
+                </TouchableOpacity>
+
+                {/* Edit button for non-default items */}
+                {allowEdit && !isDefault && onEdit && (
+                  <TouchableOpacity
+                    style={styles.editIconBtn}
+                    onPress={() => {
+                      onClose();
+                      setTimeout(() => onEdit(item), 100);
+                    }}
+                  >
+                    <Pencil size={12} color={COLORS.white} />
+                  </TouchableOpacity>
+                )}
+              </View>
             );
           })}
         </ScrollView>
@@ -92,7 +134,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopLeftRadius: RADIUS.l,
     borderTopRightRadius: RADIUS.l,
-    paddingBottom: 100, // Increased to clear Tab Bar
+    paddingBottom: 100,
     maxHeight: height * 0.7,
   },
   header: {
@@ -102,6 +144,25 @@ const styles = StyleSheet.create({
     padding: SPACING.l,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  addHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  addHeaderText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   title: {
     fontSize: 18,
@@ -117,10 +178,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  item: {
-    width: '23%', // 4 items per row roughly
-    alignItems: 'center',
+  itemContainer: {
+    width: '23%',
+    position: 'relative',
     marginBottom: SPACING.l,
+  },
+  item: {
+    alignItems: 'center',
   },
   iconWrapper: {
     width: 56,
@@ -148,7 +212,19 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '600',
   },
-  selectedItem: {
-    // Opacity or scale if needed
-  }
+  selectedItem: {},
+  // Edit button styles
+  editIconBtn: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: COLORS.primary,
+    padding: 6,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
 });

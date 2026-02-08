@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
   Modal,
   TextInput,
   Text,
@@ -27,15 +27,16 @@ export default function FriendsScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
+  const [newContactEmail, setNewContactEmail] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const { 
-    contacts, 
-    contactBalances, 
-    fetchContacts, 
-    fetchContactBalances, 
+  const {
+    contacts,
+    contactBalances,
+    fetchContacts,
+    fetchContactBalances,
     createContact,
     deleteContact,
   } = useDataStore();
@@ -73,16 +74,19 @@ export default function FriendsScreen() {
       const contact = await createContact({
         name: newContactName.trim(),
         phone_number: newContactPhone.trim() || undefined,
+        email: newContactEmail.trim() || undefined,
       });
 
       if (contact) {
         setShowAddModal(false);
         setNewContactName('');
         setNewContactPhone('');
+        setNewContactEmail('');
         await fetchContactBalances();
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to add contact');
+    } catch (error: any) {
+      console.error('Add contact failed:', error);
+      Alert.alert('Error', error.message || 'Failed to add contact');
     } finally {
       setSubmitting(false);
     }
@@ -94,8 +98,8 @@ export default function FriendsScreen() {
       `Are you sure you want to delete ${name}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             await deleteContact(id);
@@ -106,22 +110,16 @@ export default function FriendsScreen() {
     );
   };
 
-  // Map contacts with their balances
+  // Map contacts with their multi-currency balances
   const friendsData = contacts.map(contact => {
     const balance = contactBalances.find(b => b.contact_id === contact.id);
-    const netBalance = balance?.net_balance || 0;
-    
-    let status: 'owed' | 'owing' | 'settled' = 'settled';
-    if (netBalance > 0) status = 'owed';
-    else if (netBalance < 0) status = 'owing';
-    
+
     return {
       id: contact.id,
       name: contact.name,
-      description: contact.phone_number || 'No phone',
-      status,
-      amount: Math.abs(netBalance).toFixed(2),
-      currency: 'USD',
+      description: contact.phone_number || contact.email || 'No contact info',
+      balances: balance?.balances || [],
+      totalInPrimary: balance?.total_in_primary || 0,
     };
   });
 
@@ -152,8 +150,8 @@ export default function FriendsScreen() {
         data={currentData}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <FriendCard 
-            item={item as any} 
+          <FriendCard
+            item={item as any}
             isGroup={viewMode === 'Groups'}
             onLongPress={() => handleDeleteContact(item.id, item.name)}
           />
@@ -164,8 +162,8 @@ export default function FriendsScreen() {
               {viewMode === 'Friends' ? 'No friends yet' : 'No groups yet'}
             </Text>
             <Text style={styles.emptySubtext}>
-              {viewMode === 'Friends' 
-                ? 'Add friends to start splitting expenses' 
+              {viewMode === 'Friends'
+                ? 'Add friends to start splitting expenses'
                 : 'Create a group to share expenses'}
             </Text>
           </View>
@@ -183,8 +181,8 @@ export default function FriendsScreen() {
       />
 
       {/* Floating Action Button */}
-      <TouchableOpacity 
-        style={styles.fab} 
+      <TouchableOpacity
+        style={styles.fab}
         activeOpacity={0.8}
         onPress={() => setShowAddModal(true)}
       >
@@ -198,7 +196,7 @@ export default function FriendsScreen() {
         transparent={true}
         onRequestClose={() => setShowAddModal(false)}
       >
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
@@ -223,6 +221,19 @@ export default function FriendsScreen() {
             </View>
 
             <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Email (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter email address"
+                placeholderTextColor={COLORS.textSecondary}
+                value={newContactEmail}
+                onChangeText={setNewContactEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Phone Number (optional)</Text>
               <TextInput
                 style={styles.input}
@@ -233,11 +244,11 @@ export default function FriendsScreen() {
                 keyboardType="phone-pad"
               />
               <Text style={styles.inputHint}>
-                Adding a phone number enables automatic linking when they join
+                Add email or phone to link with their account
               </Text>
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
               onPress={handleAddContact}
               disabled={submitting}

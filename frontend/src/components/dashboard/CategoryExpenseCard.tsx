@@ -8,7 +8,17 @@ interface CategoryExpenseCardProps {
   count: number;
   amount: string;
   percent: number; // 0 to 1
+  currencyCode?: string;
+  isIncome?: boolean;
 }
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  'USD': '$',
+  'INR': '₹',
+  'AED': 'د.إ',
+  'EUR': '€',
+  'GBP': '£',
+};
 
 const getIcon = (category: string) => {
   switch (category) {
@@ -19,6 +29,7 @@ const getIcon = (category: string) => {
     case 'Home': return <Home size={20} color="#10B981" />;
     case 'Tech': return <Smartphone size={20} color="#6366F1" />;
     case 'Travel': return <Plane size={20} color="#F43F5E" />;
+    case 'Salary': return <Utensils size={20} color="#10B981" />;
     default: return <Utensils size={20} color={COLORS.textSecondary} />;
   }
 };
@@ -32,11 +43,23 @@ const getBgColor = (category: string) => {
     case 'Home': return '#D1FAE5'; // Emerald-100
     case 'Tech': return '#E0E7FF'; // Indigo-100
     case 'Travel': return '#FFE4E6'; // Rose-100
+    case 'Salary': return '#D1FAE5'; // Emerald-100
     default: return '#F3F4F6';
   }
 };
 
-export default function CategoryExpenseCard({ category, count, amount, percent }: CategoryExpenseCardProps) {
+export default function CategoryExpenseCard({
+  category,
+  count,
+  amount,
+  percent,
+  currencyCode = 'USD',
+  isIncome = false
+}: CategoryExpenseCardProps) {
+  const symbol = CURRENCY_SYMBOLS[currencyCode] || currencyCode;
+  const prefix = isIncome ? '+' : '-';
+  const amountColor = isIncome ? COLORS.success : COLORS.textPrimary;
+
   return (
     <TouchableOpacity style={styles.card} activeOpacity={0.7}>
       {/* Icon */}
@@ -47,21 +70,22 @@ export default function CategoryExpenseCard({ category, count, amount, percent }
       {/* Middle: Name & Count */}
       <View style={styles.content}>
         <Text style={styles.name}>{category}</Text>
-        <Text style={styles.count}>{count} transactions</Text>
+        <Text style={styles.count}>{count} transaction{count !== 1 ? 's' : ''}</Text>
       </View>
 
       {/* Right: Amount & Bar */}
       <View style={styles.rightContainer}>
-        <Text style={styles.amount}>- ${amount}</Text>
+        <Text style={[styles.amount, { color: amountColor }]}>{prefix}{symbol}{amount}</Text>
         {/* Progress Bar Background */}
         <View style={styles.barBg}>
           {/* Progress Bar Fill */}
-          <View style={[styles.barFill, { width: `${percent * 100}%` }]} />
+          <View style={[styles.barFill, { width: `${percent * 100}%`, backgroundColor: isIncome ? COLORS.success : COLORS.primary }]} />
         </View>
       </View>
     </TouchableOpacity>
   );
 }
+
 
 const styles = StyleSheet.create({
   card: {

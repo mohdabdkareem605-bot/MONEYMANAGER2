@@ -9,8 +9,8 @@ interface TransactionItemProps {
     type: 'expense' | 'income';
     desc: string;
     amount: number;
+    currency: string;
     isSplit?: boolean;
-    lent?: number;
     category: string;
     account: string;
   };
@@ -28,16 +28,16 @@ const getIcon = (category: string) => {
 
 const getBgColor = (category: string) => {
   switch (category) {
-    case 'Food': return '#F59E0B'; 
-    case 'Transport': return '#3B82F6'; 
-    case 'Shopping': return '#8B5CF6'; 
+    case 'Food': return '#F59E0B';
+    case 'Transport': return '#3B82F6';
+    case 'Shopping': return '#8B5CF6';
     default: return COLORS.success;
   }
 };
 
 export default function TransactionRow({ item, isLast }: TransactionItemProps) {
   const isExpense = item.type === 'expense';
-  
+
   return (
     <TouchableOpacity style={[styles.container, !isLast && styles.borderBottom]} activeOpacity={0.7}>
       {/* Left: Icon with Badge */}
@@ -45,7 +45,7 @@ export default function TransactionRow({ item, isLast }: TransactionItemProps) {
         <View style={[styles.iconBox, { backgroundColor: getBgColor(item.category) }]}>
           {getIcon(item.category)}
         </View>
-        
+
         {/* Split Badge */}
         {item.isSplit && (
           <View style={styles.badge}>
@@ -63,19 +63,13 @@ export default function TransactionRow({ item, isLast }: TransactionItemProps) {
       {/* Right: Values */}
       <View style={styles.values}>
         <Text style={[styles.amount, isExpense ? styles.expense : styles.income]}>
-          {isExpense ? '-' : '+'} AED {item.amount.toFixed(2)}
+          {isExpense ? '-' : '+'} {item.currency} {item.amount.toFixed(2)}
         </Text>
-        
-        {/* The Hybrid Truth */}
-        {item.isSplit && item.lent && (
-          <Text style={styles.lentText}>
-            Lent AED {item.lent.toFixed(2)}
-          </Text>
-        )}
       </View>
     </TouchableOpacity>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {

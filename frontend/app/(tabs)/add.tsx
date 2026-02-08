@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Text, 
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Text,
   Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  Utensils, Coffee, Car, ShoppingBag, Banknote, CreditCard, 
+import {
+  Utensils, Coffee, Car, ShoppingBag, Banknote, CreditCard,
   Landmark, Plane, Home, Smartphone, Briefcase, Gift, Coins, User
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -25,6 +25,7 @@ import SplitExpenseSection from '../../src/components/add-transaction/SplitExpen
 import SelectionSheet from '../../src/components/add-transaction/SelectionSheet';
 import TransferTypeToggle from '../../src/components/add-transaction/TransferTypeToggle';
 import TransferDetails from '../../src/components/add-transaction/TransferDetails';
+import AddAccountModal from '../../src/components/add-transaction/AddAccountModal';
 
 // Category icons mapping
 const CATEGORY_ICONS: Record<string, any> = {
@@ -69,30 +70,31 @@ const DEFAULT_ACCOUNTS = [
 export default function AddTransaction() {
   const router = useRouter();
   const { user } = useAuth();
-  const { 
-    accounts, 
-    contacts, 
+  const {
+    accounts,
+    contacts,
     categories,
-    fetchAccounts, 
-    fetchContacts, 
+    fetchAccounts,
+    fetchContacts,
     fetchCategories,
     createAccount,
     createTransaction,
+    updateAccount,
   } = useDataStore();
 
   const [type, setType] = useState('Expense');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<'USD' | 'AED'>('USD');
+  const [currency, setCurrency] = useState('USD');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
-  
+
   // Transfer Mode State
   const [transferType, setTransferType] = useState('Internal Transfer');
 
   // Selected items
   const [category, setCategory] = useState(DEFAULT_EXPENSE_CATEGORIES[0]);
   const [account, setAccount] = useState(DEFAULT_ACCOUNTS[0]);
-  
+
   // Transfer Specific
   const [fromAccount, setFromAccount] = useState(DEFAULT_ACCOUNTS[0]);
   const [toAccount, setToAccount] = useState(DEFAULT_ACCOUNTS[1]);
@@ -104,6 +106,10 @@ export default function AddTransaction() {
 
   const [sheetVisible, setSheetVisible] = useState(false);
   const [sheetType, setSheetType] = useState<'category' | 'account' | 'fromAccount' | 'toAccount' | 'friend'>('category');
+
+  // Add Account Modal State
+  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
 
   // Load data on mount
   useEffect(() => {
@@ -130,8 +136,9 @@ export default function AddTransaction() {
     return accounts.map(acc => ({
       id: acc.id,
       label: acc.name,
-      icon: acc.name.toLowerCase().includes('cash') ? Banknote : 
-            acc.name.toLowerCase().includes('card') ? CreditCard : Landmark,
+      icon: acc.name.toLowerCase().includes('cash') ? Banknote :
+        acc.name.toLowerCase().includes('card') ? CreditCard : Landmark,
+      currency: acc.currency_code,
     }));
   }, [accounts]);
 
@@ -161,10 +168,17 @@ export default function AddTransaction() {
     }
   }, [mappedFriends]);
 
-  // Reset category on type change
+  // Reset category and splits on type change
   useEffect(() => {
-    if (type === 'Income') setCategory(DEFAULT_INCOME_CATEGORIES[0]);
-    if (type === 'Expense') setCategory(mappedCategories[0] || DEFAULT_EXPENSE_CATEGORIES[0]);
+    if (type === 'Income') {
+      setCategory(DEFAULT_INCOME_CATEGORIES[0]);
+    }
+    if (type === 'Expense') {
+      setCategory(mappedCategories[0] || DEFAULT_EXPENSE_CATEGORIES[0]);
+    }
+    // Always reset splits when changing types
+    setSelectedFriends([]);
+    setSplitAmounts({});
   }, [type]);
 
   // Handlers for Standard Mode
@@ -199,6 +213,72 @@ export default function AddTransaction() {
     else if (sheetType === 'friend') setFriend(item);
   };
 
+  // Handle adding new account via modal
+  const handleOpenAddAccount = () => {
+    setEditingAccount(null);
+    setShowAddAccountModal(true);
+  };
+
+  // Handle editing account via modal
+  const handleEditAccount = (item: any) => {
+    // Find the full account data
+    const fullAccount = accounts.find(a => a.id === item.id);
+    if (fullAccount) {
+      setEditingAccount(fullAccount);
+      setShowAddAccountModal(true);
+    }
+  };
+
+  // Handle save account from modal
+  const handleSaveAccount = async (data: { name: string; currency_code: string; current_balance: number }) => {
+    try {
+      if (editingAccount) {
+        // Use updateAccount instead of alert
+        const updated = await updateAccount(editingAccount.id, {
+          name: data.name,
+          currency_code: data.currency_code,
+          current_balance: data.current_balance,
+        });
+
+        if (updated) {
+          await fetchAccounts();
+          // Update dropdown selection if editing currently selected account
+          const mappedUpdate = {
+            id: updated.id,
+            label: updated.name,
+            icon: updated.name.toLowerCase().includes('cash') ? Banknote :
+              updated.name.toLowerCase().includes('card') ? CreditCard : Landmark,
+            currency: updated.currency_code,
+          };
+
+          if (sheetType === 'account' && account.id === updated.id) setAccount(mappedUpdate);
+          else if (sheetType === 'fromAccount' && fromAccount.id === updated.id) setFromAccount(mappedUpdate);
+          else if (sheetType === 'toAccount' && toAccount.id === updated.id) setToAccount(mappedUpdate);
+
+          Alert.alert('Success', `Account updated!`);
+        }
+      } else {
+        const newAccount = await createAccount(data);
+        if (newAccount) {
+          await fetchAccounts();
+          const mappedNew = {
+            id: newAccount.id,
+            label: newAccount.name,
+            icon: Landmark,
+            currency: newAccount.currency_code,
+          };
+          if (sheetType === 'account') setAccount(mappedNew);
+          else if (sheetType === 'fromAccount') setFromAccount(mappedNew);
+          else if (sheetType === 'toAccount') setToAccount(mappedNew);
+          Alert.alert('Success', `Account "${data.name}" created!`);
+        }
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save account');
+    }
+  };
+
+
   const isTransfer = type === 'Transfer';
   const isExpense = type === 'Expense';
   const isIncome = type === 'Income';
@@ -206,7 +286,7 @@ export default function AddTransaction() {
   // Determine Sheet Data
   let sheetTitle = 'Select Item';
   let sheetItems: any[] = [];
-  
+
   if (sheetType === 'category') {
     sheetTitle = 'Select Category';
     sheetItems = type === 'Income' ? DEFAULT_INCOME_CATEGORIES : mappedCategories;
@@ -224,7 +304,7 @@ export default function AddTransaction() {
   // Handle save transaction
   const handleSave = async () => {
     const amountNum = parseFloat(amount);
-    
+
     if (!amountNum || amountNum <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
@@ -248,23 +328,38 @@ export default function AddTransaction() {
         }
       }
 
-      // Build splits from selected friends
-      const splits = selectedFriends.map(friendId => {
-        const splitAmount = splitAmounts[friendId] || (amountNum / (selectedFriends.length + 1));
-        return {
-          contact_id: friendId,
-          amount: splitAmount, // Positive = they owe me
-        };
-      });
+      // Build splits from selected friends (ONLY FOR EXPENSE)
+      // Handle reverse contacts by stripping the "reverse_" prefix for database operations
+      let splits: any[] = [];
+
+      if (type === 'Expense') {
+        splits = selectedFriends.map(friendId => {
+          const splitAmount = splitAmounts[friendId] || (amountNum / (selectedFriends.length + 1));
+          // Strip reverse_ prefix if present - reverse contacts are virtual IDs not valid in DB
+          const actualContactId = friendId.startsWith('reverse_')
+            ? friendId.replace('reverse_', '')
+            : friendId;
+          return {
+            contact_id: actualContactId,
+            amount: splitAmount, // Positive = they owe me
+          };
+        });
+      }
 
       // Create transaction
+      // Helper to check if a string is a valid UUID
+      const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
       const transaction = await createTransaction({
         account_id: accountId,
         total_amount: amountNum,
         currency_code: currency,
         description: note || category.label,
+        transaction_type: type.toUpperCase() as 'INCOME' | 'EXPENSE' | 'TRANSFER',
+        category_id: isValidUUID(category.id) ? category.id : undefined,
         splits,
       });
+
 
       if (transaction) {
         Alert.alert('Success', 'Transaction saved!', [
@@ -286,15 +381,15 @@ export default function AddTransaction() {
       <View style={styles.content}>
         {/* 1. Header: Segmented Toggle */}
         <TransactionTypeToggle type={type} setType={setType} />
-        
+
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          
+
           {/* 2. Amount Input */}
-          <AmountInput 
-            amount={amount} 
-            setAmount={setAmount} 
-            currency={currency} 
-            setCurrency={setCurrency} 
+          <AmountInput
+            amount={amount}
+            setAmount={setAmount}
+            currency={currency}
+            setCurrency={setCurrency}
             variant={isTransfer ? 'standard' : 'hero'}
           />
 
@@ -302,7 +397,7 @@ export default function AddTransaction() {
           {isTransfer && (
             <>
               <TransferTypeToggle type={transferType} setType={setTransferType} />
-              <TransferDetails 
+              <TransferDetails
                 transferType={transferType as any}
                 fromAccount={fromAccount.label}
                 toAccount={transferType === 'Pay Friend' ? (friend?.label || 'Select Friend') : toAccount.label}
@@ -318,8 +413,8 @@ export default function AddTransaction() {
           {!isTransfer && (
             <>
               {isExpense && (
-                <SplitExpenseSection 
-                  amount={parseFloat(amount) || 0} 
+                <SplitExpenseSection
+                  amount={parseFloat(amount) || 0}
                   friends={mappedFriends}
                   selectedFriends={selectedFriends}
                   setSelectedFriends={setSelectedFriends}
@@ -327,7 +422,7 @@ export default function AddTransaction() {
                   setSplitAmounts={setSplitAmounts}
                 />
               )}
-              
+
               <TransactionDetails
                 category={category.label}
                 account={account.label}
@@ -339,14 +434,14 @@ export default function AddTransaction() {
               />
             </>
           )}
-          
+
           <View style={styles.spacer} />
         </ScrollView>
 
         {/* 5. Save Button */}
         <View style={styles.footer}>
-          <TouchableOpacity 
-            style={[styles.saveBtn, saving && styles.saveBtnDisabled]} 
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
             activeOpacity={0.8}
             onPress={handleSave}
             disabled={saving}
@@ -360,19 +455,34 @@ export default function AddTransaction() {
         </View>
       </View>
 
-      <SelectionSheet 
-        isVisible={sheetVisible} 
+      <SelectionSheet
+        isVisible={sheetVisible}
         onClose={() => setSheetVisible(false)}
         title={sheetTitle}
         items={sheetItems}
         onSelect={handleSelect}
         selectedId={
-           sheetType === 'category' ? category.id : 
-           sheetType === 'account' ? account.id :
-           sheetType === 'fromAccount' ? fromAccount.id :
-           sheetType === 'toAccount' ? toAccount.id :
-           friend?.id
+          sheetType === 'category' ? category.id :
+            sheetType === 'account' ? account.id :
+              sheetType === 'fromAccount' ? fromAccount.id :
+                sheetType === 'toAccount' ? toAccount.id :
+                  friend?.id
         }
+        allowAdd={sheetType === 'account' || sheetType === 'fromAccount' || sheetType === 'toAccount'}
+        allowEdit={sheetType === 'account' || sheetType === 'fromAccount' || sheetType === 'toAccount'}
+        onAddNew={sheetType.includes('Account') || sheetType === 'account' ? handleOpenAddAccount : undefined}
+        onEdit={sheetType.includes('Account') || sheetType === 'account' ? handleEditAccount : undefined}
+        addButtonLabel="Add Account"
+      />
+
+      <AddAccountModal
+        isVisible={showAddAccountModal}
+        onClose={() => {
+          setShowAddAccountModal(false);
+          setEditingAccount(null);
+        }}
+        onSave={handleSaveAccount}
+        editingAccount={editingAccount}
       />
     </SafeAreaView>
   );

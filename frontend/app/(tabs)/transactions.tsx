@@ -12,21 +12,21 @@ const formatDate = (dateStr: string) => {
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  
+
   if (date.toDateString() === today.toDateString()) return 'Today';
   if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  
-  return date.toLocaleDateString('en-US', { 
-    weekday: 'short', 
-    day: 'numeric', 
-    month: 'short' 
+
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
   });
 };
 
 // Group transactions by date
 const groupTransactionsByDate = (transactions: Transaction[]) => {
   const groups: Record<string, Transaction[]> = {};
-  
+
   transactions.forEach(tx => {
     const dateKey = formatDate(tx.occurred_at);
     if (!groups[dateKey]) {
@@ -34,27 +34,35 @@ const groupTransactionsByDate = (transactions: Transaction[]) => {
     }
     groups[dateKey].push(tx);
   });
-  
+
   return Object.entries(groups).map(([title, data]) => ({
     title,
-    data: data.map(tx => ({
-      id: tx.id,
-      type: tx.total_amount >= 0 ? 'expense' : 'income',
-      desc: tx.description || 'Transaction',
-      amount: Math.abs(tx.total_amount),
-      category: tx.description || 'Other',
-      account: tx.account_name || 'Account',
-      isSplit: tx.splits && tx.splits.length > 0,
-      lent: tx.splits?.reduce((sum, s) => sum + (s.amount > 0 ? s.amount : 0), 0) || 0,
-    })),
+    data: data.map(tx => {
+      // Calculate net amount (User's share)
+      // Total - Splits (Debt)
+      const debtAmount = tx.splits?.reduce((sum, s) => sum + (s.amount > 0 ? s.amount : 0), 0) || 0;
+      const netAmount = Math.abs(tx.total_amount) - debtAmount;
+
+      return {
+        id: tx.id,
+        type: tx.transaction_type === 'INCOME' ? 'income' : 'expense',
+        desc: tx.description || 'Transaction',
+        amount: netAmount > 0 ? netAmount : 0, // Ensure no negative amounts
+        currency: tx.currency_code || 'AED', // Fallback to AED if missing, but should exist
+        category: tx.description || 'Other',
+        account: tx.account_name || 'Account',
+        isSplit: tx.splits && tx.splits.length > 0,
+      };
+    }),
   }));
+
 };
 
 export default function TransactionsScreen() {
   const [activeFilter, setActiveFilter] = useState('All');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   const { transactions, fetchTransactions } = useDataStore();
 
   useEffect(() => {
@@ -81,15 +89,15 @@ export default function TransactionsScreen() {
   // Filter and group transactions
   const filteredTransactions = React.useMemo(() => {
     let filtered = transactions;
-    
+
     if (activeFilter === 'Expenses') {
-      filtered = transactions.filter(t => t.total_amount > 0);
+      filtered = transactions.filter(t => t.transaction_type === 'EXPENSE');
     } else if (activeFilter === 'Income') {
-      filtered = transactions.filter(t => t.total_amount < 0);
+      filtered = transactions.filter(t => t.transaction_type === 'INCOME');
     } else if (activeFilter === 'Split') {
       filtered = transactions.filter(t => t.splits && t.splits.length > 0);
     }
-    
+
     return groupTransactionsByDate(filtered);
   }, [transactions, activeFilter]);
 
@@ -105,25 +113,25 @@ export default function TransactionsScreen() {
   return (
     <View style={styles.container}>
       <TransactionsHeader activeFilter={activeFilter} setActiveFilter={setActiveFilter} />
-      
+
       <SectionList
         sections={filteredTransactions as any}
         keyExtractor={(item) => item.id}
-        
+
         renderSectionHeader={({ section: { title } }) => (
           <Text style={styles.sectionHeader}>{title}</Text>
         )}
-        
+
         renderItem={({ item, index, section }) => (
           <View style={[
             styles.itemContainer,
             index === 0 && styles.firstItem,
             index === section.data.length - 1 && styles.lastItem,
           ]}>
-             <TransactionRow item={item} isLast={index === section.data.length - 1} />
+            <TransactionRow item={item} isLast={index === section.data.length - 1} />
           </View>
         )}
-        
+
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No transactions yet</Text>
@@ -132,7 +140,7 @@ export default function TransactionsScreen() {
             </Text>
           </View>
         }
-        
+
         contentContainerStyle={[
           styles.listContent,
           filteredTransactions.length === 0 && styles.emptyListContent,

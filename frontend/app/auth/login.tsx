@@ -12,27 +12,32 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Phone, ArrowRight, Shield } from 'lucide-react-native';
+import { Mail, Phone, ArrowRight, Shield } from 'lucide-react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING } from '../../src/constants/theme';
 import { useAuth } from '../../src/contexts/AuthContext';
 
+type AuthMode = 'phone' | 'email';
+
 export default function LoginScreen() {
   const router = useRouter();
-  const { signInWithPhone, loading } = useAuth();
-  
+  const { signInWithPhone, signInWithEmail, loading } = useAuth();
+
+  const [authMode, setAuthMode] = useState<AuthMode>('email');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [countryCode, setCountryCode] = useState('+1');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleSendOTP = async () => {
     const fullPhone = `${countryCode}${phoneNumber.replace(/\D/g, '')}`;
-    
+
     if (phoneNumber.length < 10) {
       Alert.alert('Invalid Phone', 'Please enter a valid phone number');
       return;
     }
-    
+
     const { error } = await signInWithPhone(fullPhone);
-    
+
     if (error) {
       Alert.alert('Error', error.message || 'Failed to send OTP');
     } else {
@@ -40,6 +45,44 @@ export default function LoginScreen() {
         pathname: '/auth/verify',
         params: { phone: fullPhone },
       });
+    }
+  };
+
+  const handleEmailLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
+    }
+
+    const { error } = await signInWithEmail(email, password);
+
+    if (error) {
+      // If user doesn't exist, try to sign up
+      if (error.message?.includes('Invalid login credentials')) {
+        Alert.alert(
+          'Account Not Found',
+          'Would you like to create a new account with this email?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Create Account',
+              onPress: () => router.push('/auth/signup')
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Login Failed', error.message || 'Invalid credentials');
+      }
+    } else {
+      router.replace('/(tabs)/dashboard');
+    }
+  };
+
+  const handleSubmit = () => {
+    if (authMode === 'phone') {
+      handleSendOTP();
+    } else {
+      handleEmailLogin();
     }
   };
 
@@ -52,45 +95,103 @@ export default function LoginScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconContainer}>
-            <Phone size={32} color={COLORS.white} />
+            {authMode === 'phone' ? (
+              <Phone size={32} color={COLORS.white} />
+            ) : (
+              <Mail size={32} color={COLORS.white} />
+            )}
           </View>
-          <Text style={styles.title}>Welcome to SplitWise</Text>
+          <Text style={styles.title}>Welcome to FinanceFlow</Text>
           <Text style={styles.subtitle}>
-            Enter your phone number to sign in or create an account
+            {authMode === 'phone'
+              ? 'Enter your phone number to sign in'
+              : 'Sign in with your email and password'}
           </Text>
         </View>
 
-        {/* Phone Input */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Phone Number</Text>
-          <View style={styles.phoneInputRow}>
-            <TouchableOpacity style={styles.countryCodeBtn}>
-              <Text style={styles.countryCodeText}>{countryCode}</Text>
-            </TouchableOpacity>
-            <TextInput
-              style={styles.phoneInput}
-              placeholder="Enter phone number"
-              placeholderTextColor={COLORS.textSecondary}
-              keyboardType="phone-pad"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              maxLength={15}
-            />
-          </View>
+        {/* Auth Mode Toggle */}
+        <View style={styles.toggleContainer}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, authMode === 'email' && styles.toggleBtnActive]}
+            onPress={() => setAuthMode('email')}
+          >
+            <Mail size={18} color={authMode === 'email' ? COLORS.white : COLORS.textSecondary} />
+            <Text style={[styles.toggleText, authMode === 'email' && styles.toggleTextActive]}>
+              Email
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, authMode === 'phone' && styles.toggleBtnActive]}
+            onPress={() => setAuthMode('phone')}
+          >
+            <Phone size={18} color={authMode === 'phone' ? COLORS.white : COLORS.textSecondary} />
+            <Text style={[styles.toggleText, authMode === 'phone' && styles.toggleTextActive]}>
+              Phone
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {/* Input Section */}
+        {authMode === 'phone' ? (
+          <View style={styles.inputSection}>
+            <Text style={styles.label}>Phone Number</Text>
+            <View style={styles.phoneInputRow}>
+              <TouchableOpacity style={styles.countryCodeBtn}>
+                <Text style={styles.countryCodeText}>{countryCode}</Text>
+              </TouchableOpacity>
+              <TextInput
+                style={styles.phoneInput}
+                placeholder="Enter phone number"
+                placeholderTextColor={COLORS.textSecondary}
+                keyboardType="phone-pad"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                maxLength={15}
+              />
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.inputSection}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor={COLORS.textSecondary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={email}
+                onChangeText={setEmail}
+              />
+            </View>
+            <View style={styles.inputSection}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor={COLORS.textSecondary}
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+              />
+            </View>
+          </>
+        )}
 
         {/* Info */}
         <View style={styles.infoBox}>
           <Shield size={16} color={COLORS.primary} />
           <Text style={styles.infoText}>
-            We'll send you a verification code via SMS
+            {authMode === 'phone'
+              ? "We'll send you a verification code via SMS"
+              : "Your data is encrypted and secure"}
           </Text>
         </View>
 
         {/* Submit Button */}
         <TouchableOpacity
           style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
-          onPress={handleSendOTP}
+          onPress={handleSubmit}
           disabled={loading}
           activeOpacity={0.8}
         >
@@ -98,19 +199,24 @@ export default function LoginScreen() {
             <ActivityIndicator color={COLORS.white} />
           ) : (
             <>
-              <Text style={styles.submitBtnText}>Continue</Text>
+              <Text style={styles.submitBtnText}>
+                {authMode === 'phone' ? 'Continue' : 'Sign In'}
+              </Text>
               <ArrowRight size={20} color={COLORS.white} />
             </>
           )}
         </TouchableOpacity>
 
-        {/* Demo Mode */}
-        <TouchableOpacity
-          style={styles.demoBtn}
-          onPress={() => router.replace('/(tabs)/dashboard')}
-        >
-          <Text style={styles.demoBtnText}>Continue in Demo Mode</Text>
-        </TouchableOpacity>
+        {/* Sign Up Link */}
+        {authMode === 'email' && (
+          <TouchableOpacity
+            style={styles.signupBtn}
+            onPress={() => router.push('/auth/signup')}
+          >
+            <Text style={styles.signupText}>Don't have an account? </Text>
+            <Text style={styles.signupLink}>Sign Up</Text>
+          </TouchableOpacity>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -127,8 +233,8 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginTop: SPACING.xxl,
-    marginBottom: SPACING.xl,
+    marginTop: SPACING.xl,
+    marginBottom: SPACING.l,
   },
   iconContainer: {
     width: 72,
@@ -152,6 +258,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.l,
+    padding: 4,
+    marginBottom: SPACING.l,
+  },
+  toggleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.m,
+    borderRadius: RADIUS.m,
+    gap: SPACING.xs,
+  },
+  toggleBtnActive: {
+    backgroundColor: COLORS.primary,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  toggleTextActive: {
+    color: COLORS.white,
+  },
   inputSection: {
     marginBottom: SPACING.m,
   },
@@ -160,6 +293,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.textPrimary,
     marginBottom: SPACING.s,
+  },
+  input: {
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.m,
+    paddingHorizontal: SPACING.m,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    height: 56,
   },
   phoneInputRow: {
     flexDirection: 'row',
@@ -196,7 +339,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primaryLight,
     padding: SPACING.m,
     borderRadius: RADIUS.m,
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.l,
     gap: SPACING.s,
   },
   infoText: {
@@ -222,13 +365,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  demoBtn: {
+  signupBtn: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     marginTop: SPACING.m,
     padding: SPACING.m,
-    alignItems: 'center',
   },
-  demoBtnText: {
-    color: COLORS.textSecondary,
+  signupText: {
     fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  signupLink: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '600',
   },
 });

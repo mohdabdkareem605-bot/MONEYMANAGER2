@@ -2,20 +2,24 @@ import React, { useState } from 'react';
 import { View, TextInput, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { COLORS, SPACING, RADIUS, SHADOWS } from '../../constants/theme';
 
+// Supported currencies
+const CURRENCIES = ['USD', 'INR', 'AED', 'EUR', 'GBP'] as const;
+type CurrencyType = typeof CURRENCIES[number];
+
 interface AmountInputProps {
   amount: string;
   setAmount: (val: string) => void;
-  currency: 'USD' | 'AED';
-  setCurrency: (curr: 'USD' | 'AED') => void;
+  currency: string;
+  setCurrency: (curr: string) => void;
   variant?: 'hero' | 'standard'; // Added variant
 }
 
-export default function AmountInput({ 
-  amount, 
-  setAmount, 
-  currency, 
+export default function AmountInput({
+  amount,
+  setAmount,
+  currency,
   setCurrency,
-  variant = 'hero' 
+  variant = 'hero'
 }: AmountInputProps) {
   // Formatted Date
   const dateStr = new Date().toLocaleDateString('en-US', {
@@ -28,34 +32,37 @@ export default function AmountInput({
   });
   const fullDateDisplay = `${dateStr}, ${timeStr}`;
 
+  // Cycle through currencies on tap
   const handleCurrencyToggle = () => {
-    setCurrency(currency === 'AED' ? 'USD' : 'AED');
+    const currentIndex = CURRENCIES.indexOf(currency as CurrencyType);
+    const nextIndex = (currentIndex + 1) % CURRENCIES.length;
+    setCurrency(CURRENCIES[nextIndex]);
   };
 
   if (variant === 'standard') {
     return (
       <View style={styles.standardContainer}>
-         <View style={styles.standardRow}>
-            <Text style={styles.label}>Amount</Text>
-            
-            <View style={styles.standardInputWrapper}>
-              <TouchableOpacity 
-                style={styles.standardCurrencyChip} 
-                onPress={handleCurrencyToggle}
-              >
-                <Text style={styles.standardCurrencyText}>{currency}</Text>
-              </TouchableOpacity>
+        <View style={styles.standardRow}>
+          <Text style={styles.label}>Amount</Text>
 
-              <TextInput
-                style={styles.standardInput}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0.00"
-                placeholderTextColor="#C7C7CC"
-                keyboardType="numeric"
-              />
-            </View>
-         </View>
+          <View style={styles.standardInputWrapper}>
+            <TouchableOpacity
+              style={styles.standardCurrencyChip}
+              onPress={handleCurrencyToggle}
+            >
+              <Text style={styles.standardCurrencyText}>{currency}</Text>
+            </TouchableOpacity>
+
+            <TextInput
+              style={styles.standardInput}
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0.00"
+              placeholderTextColor="#C7C7CC"
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
       </View>
     );
   }
@@ -72,8 +79,8 @@ export default function AmountInput({
       {/* Row 2: Splitwise Style Input */}
       <View style={styles.inputRow}>
         {/* Currency Button (Rounded Square) */}
-        <TouchableOpacity 
-          style={styles.currencyButton} 
+        <TouchableOpacity
+          style={styles.currencyButton}
           onPress={handleCurrencyToggle}
           activeOpacity={0.7}
         >
@@ -108,7 +115,7 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: 24,
     marginVertical: 24,
-    paddingHorizontal: SPACING.s, 
+    paddingHorizontal: SPACING.s,
   },
   dateRow: {
     flexDirection: 'row',

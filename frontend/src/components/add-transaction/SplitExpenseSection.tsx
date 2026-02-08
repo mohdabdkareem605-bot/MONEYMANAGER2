@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, Switch, TouchableOpacity, StyleSheet, ScrollView, LayoutAnimation, Platform, UIManager } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Switch, TouchableOpacity, StyleSheet, ScrollView, LayoutAnimation, Platform, UIManager, TextInput } from 'react-native';
 import { Plus, User, Check, X } from 'lucide-react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING } from '../../constants/theme';
 
@@ -23,10 +23,10 @@ interface SplitExpenseSectionProps {
   setSplitAmounts?: (amounts: Record<string, number>) => void;
 }
 
-const SPLIT_TYPES = ['Equal', 'Exact', '%'];
+const SPLIT_TYPES = ['Equal', 'Percentage', 'Custom'];
 
-export default function SplitExpenseSection({ 
-  amount, 
+export default function SplitExpenseSection({
+  amount,
   friends = [],
   selectedFriends = [],
   setSelectedFriends,
@@ -36,6 +36,13 @@ export default function SplitExpenseSection({
   const [isSplit, setIsSplit] = useState(false);
   const [splitType, setSplitType] = useState('Equal');
   const [showFriendPicker, setShowFriendPicker] = useState(false);
+
+  // Smart fields: what you paid and your share
+  const [youPaid, setYouPaid] = useState<string>('');
+  const [yourShare, setYourShare] = useState<string>('');
+
+  // Percentage splits (for percentage mode)
+  const [percentages, setPercentages] = useState<Record<string, string>>({});
 
   const toggleSplit = (value: boolean) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -47,7 +54,7 @@ export default function SplitExpenseSection({
 
   const toggleFriend = (friendId: string) => {
     if (!setSelectedFriends) return;
-    
+
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     if (selectedFriends.includes(friendId)) {
       setSelectedFriends(selectedFriends.filter(id => id !== friendId));
@@ -56,12 +63,97 @@ export default function SplitExpenseSection({
     }
   };
 
-  // Calculate split amounts
+  // Calculate participant count
   const participantCount = selectedFriends.length + 1; // +1 for self
-  const perPersonAmount = participantCount > 1 ? amount / participantCount : 0;
-  const lendingAmount = participantCount > 1 ? amount - perPersonAmount : 0;
+
+  // Initialize "You Paid" with amount when it changes
+  useEffect(() => {
+    if (amount > 0) {
+      setYouPaid(amount.toString());
+    }
+  }, [amount]);
+
+  // Auto-calculate based on split type
+  useEffect(() => {
+    if (!setSplitAmounts || selectedFriends.length === 0) return;
+
+    if (splitType === 'Equal') {
+      const equalAmount = amount / participantCount;
+      const newAmounts: Record<string, number> = {};
+      selectedFriends.forEach(id => {
+        newAmounts[id] = equalAmount;
+      });
+      setSplitAmounts(newAmounts);
+      setYourShare(equalAmount.toFixed(2));
+
+      // Set equal percentages
+      const equalPercent = (100 / participantCount).toFixed(1);
+      const newPercentages: Record<string, string> = { you: equalPercent };
+      selectedFriends.forEach(id => {
+        newPercentages[id] = equalPercent;
+      });
+      setPercentages(newPercentages);
+    }
+  }, [splitType, selectedFriends.length, amount, participantCount]);
+
+  // Smart auto-calculation for 2 users
+  const handleYouPaidChange = (value: string) => {
+    setYouPaid(value);
+  };
+
+  const handleYourShareChange = (value: string) => {
+    setYourShare(value);
+    const yourShareNum = parseFloat(value) || 0;
+
+    // For 2 participants, auto-calculate friend's share
+    if (participantCount === 2 && selectedFriends.length === 1 && setSplitAmounts) {
+      const friendShare = amount - yourShareNum;
+      setSplitAmounts({ [selectedFriends[0]]: friendShare > 0 ? friendShare : 0 });
+    }
+  };
+
+  const updateFriendAmount = (friendId: string, value: string) => {
+    if (!setSplitAmounts) return;
+    const numValue = parseFloat(value) || 0;
+    setSplitAmounts({ ...splitAmounts, [friendId]: numValue });
+
+    // For 2 participants, auto-calculate your share
+    if (participantCount === 2 && selectedFriends.length === 1) {
+      const yourShareCalc = amount - numValue;
+      setYourShare(yourShareCalc > 0 ? yourShareCalc.toFixed(2) : '0');
+    }
+  };
+
+  const updatePercentage = (id: string, value: string) => {
+    const newPercentages = { ...percentages, [id]: value };
+    setPercentages(newPercentages);
+
+    // Recalculate amounts based on percentages
+    if (setSplitAmounts) {
+      const yourPercent = parseFloat(newPercentages.you || '0') / 100;
+      setYourShare((amount * yourPercent).toFixed(2));
+
+      const newAmounts: Record<string, number> = {};
+      selectedFriends.forEach(friendId => {
+        const friendPercent = parseFloat(newPercentages[friendId] || '0') / 100;
+        newAmounts[friendId] = amount * friendPercent;
+      });
+      setSplitAmounts(newAmounts);
+    }
+  };
 
   const selectedFriendsList = friends.filter(f => selectedFriends.includes(f.id));
+
+  // Calculate totals
+  const totalFriendSplit = selectedFriends.reduce((sum, id) => sum + (splitAmounts[id] || 0), 0);
+  const yourShareNum = parseFloat(yourShare) || 0;
+  const youPaidNum = parseFloat(youPaid) || 0;
+  const lendingAmount = youPaidNum - yourShareNum;
+
+  // Validation
+  const totalPercentage = Object.values(percentages).reduce((sum, p) => sum + (parseFloat(p) || 0), 0);
+  const isPercentageValid = splitType !== 'Percentage' || Math.abs(totalPercentage - 100) < 0.1;
+  const isTotalValid = splitType === 'Equal' || Math.abs(yourShareNum + totalFriendSplit - amount) < 0.01;
 
   return (
     <View style={styles.container}>
@@ -78,7 +170,7 @@ export default function SplitExpenseSection({
 
       {isSplit && (
         <View style={styles.logicalLayer}>
-          
+
           {/* Participants Row */}
           <Text style={styles.sectionLabel}>Participants</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.participantsScroll}>
@@ -93,8 +185,8 @@ export default function SplitExpenseSection({
 
               {/* Selected Friends */}
               {selectedFriendsList.map((friend) => (
-                <TouchableOpacity 
-                  key={friend.id} 
+                <TouchableOpacity
+                  key={friend.id}
                   style={styles.participant}
                   onPress={() => toggleFriend(friend.id)}
                 >
@@ -113,7 +205,7 @@ export default function SplitExpenseSection({
               ))}
 
               {/* Add Button */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.addBtn}
                 onPress={() => setShowFriendPicker(!showFriendPicker)}
               >
@@ -171,22 +263,204 @@ export default function SplitExpenseSection({
             ))}
           </View>
 
+          {/* You Paid Field (always visible) */}
+          {selectedFriends.length > 0 && (
+            <View style={styles.splitInputSection}>
+              <Text style={styles.splitInputLabel}>You Paid</Text>
+              <View style={styles.splitInputRow}>
+                <View style={styles.splitInputPerson}>
+                  <View style={[styles.smallAvatar, { backgroundColor: COLORS.primary }]}>
+                    <User size={14} color={COLORS.white} />
+                  </View>
+                  <Text style={styles.splitInputName}>Total Paid</Text>
+                </View>
+                <View style={styles.splitInputWrapper}>
+                  <TextInput
+                    style={styles.splitInput}
+                    value={youPaid}
+                    onChangeText={handleYouPaidChange}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor={COLORS.textSecondary}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* EQUAL Mode - Just shows calculated values */}
+          {splitType === 'Equal' && selectedFriends.length > 0 && (
+            <View style={styles.splitInputSection}>
+              <Text style={styles.splitInputLabel}>Equal Split ({participantCount} people)</Text>
+
+              <View style={styles.splitInputRow}>
+                <View style={styles.splitInputPerson}>
+                  <View style={[styles.smallAvatar, { backgroundColor: COLORS.primary }]}>
+                    <User size={14} color={COLORS.white} />
+                  </View>
+                  <Text style={styles.splitInputName}>Your Share</Text>
+                </View>
+                <Text style={styles.splitAmountDisplay}>
+                  {(amount / participantCount).toFixed(2)}
+                </Text>
+              </View>
+
+              {selectedFriendsList.map((friend) => (
+                <View key={friend.id} style={styles.splitInputRow}>
+                  <View style={styles.splitInputPerson}>
+                    <View style={styles.smallAvatar}>
+                      <Text style={styles.smallAvatarText}>
+                        {friend.label.substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.splitInputName} numberOfLines={1}>{friend.label}</Text>
+                  </View>
+                  <Text style={styles.splitAmountDisplay}>
+                    {(amount / participantCount).toFixed(2)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* PERCENTAGE Mode */}
+          {splitType === 'Percentage' && selectedFriends.length > 0 && (
+            <View style={styles.splitInputSection}>
+              <Text style={styles.splitInputLabel}>Enter percentages</Text>
+
+              {/* Your percentage */}
+              <View style={styles.splitInputRow}>
+                <View style={styles.splitInputPerson}>
+                  <View style={[styles.smallAvatar, { backgroundColor: COLORS.primary }]}>
+                    <User size={14} color={COLORS.white} />
+                  </View>
+                  <Text style={styles.splitInputName}>Your Share</Text>
+                </View>
+                <View style={styles.splitInputWrapper}>
+                  <TextInput
+                    style={styles.splitInput}
+                    value={percentages.you || ''}
+                    onChangeText={(value) => updatePercentage('you', value)}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor={COLORS.textSecondary}
+                  />
+                  <Text style={styles.percentSymbol}>%</Text>
+                </View>
+              </View>
+
+              {/* Friends percentages */}
+              {selectedFriendsList.map((friend) => (
+                <View key={friend.id} style={styles.splitInputRow}>
+                  <View style={styles.splitInputPerson}>
+                    <View style={styles.smallAvatar}>
+                      <Text style={styles.smallAvatarText}>
+                        {friend.label.substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.splitInputName} numberOfLines={1}>{friend.label}</Text>
+                  </View>
+                  <View style={styles.splitInputWrapper}>
+                    <TextInput
+                      style={styles.splitInput}
+                      value={percentages[friend.id] || ''}
+                      onChangeText={(value) => updatePercentage(friend.id, value)}
+                      keyboardType="decimal-pad"
+                      placeholder="0"
+                      placeholderTextColor={COLORS.textSecondary}
+                    />
+                    <Text style={styles.percentSymbol}>%</Text>
+                  </View>
+                </View>
+              ))}
+
+              {/* Percentage validation */}
+              {!isPercentageValid && (
+                <Text style={styles.validationWarning}>
+                  Total: {totalPercentage.toFixed(1)}% (should be 100%)
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* CUSTOM Mode - Editable amounts */}
+          {splitType === 'Custom' && selectedFriends.length > 0 && (
+            <View style={styles.splitInputSection}>
+              <Text style={styles.splitInputLabel}>Enter exact amounts</Text>
+
+              {/* Your Share */}
+              <View style={styles.splitInputRow}>
+                <View style={styles.splitInputPerson}>
+                  <View style={[styles.smallAvatar, { backgroundColor: COLORS.primary }]}>
+                    <User size={14} color={COLORS.white} />
+                  </View>
+                  <Text style={styles.splitInputName}>Your Share</Text>
+                </View>
+                <View style={styles.splitInputWrapper}>
+                  <TextInput
+                    style={styles.splitInput}
+                    value={yourShare}
+                    onChangeText={handleYourShareChange}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                    placeholderTextColor={COLORS.textSecondary}
+                  />
+                </View>
+              </View>
+
+              {/* Friends amounts */}
+              {selectedFriendsList.map((friend) => (
+                <View key={friend.id} style={styles.splitInputRow}>
+                  <View style={styles.splitInputPerson}>
+                    <View style={styles.smallAvatar}>
+                      <Text style={styles.smallAvatarText}>
+                        {friend.label.substring(0, 2).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.splitInputName} numberOfLines={1}>{friend.label}</Text>
+                  </View>
+                  <View style={styles.splitInputWrapper}>
+                    <TextInput
+                      style={styles.splitInput}
+                      value={(splitAmounts[friend.id] || '').toString()}
+                      onChangeText={(value) => updateFriendAmount(friend.id, value)}
+                      keyboardType="decimal-pad"
+                      placeholder="0"
+                      placeholderTextColor={COLORS.textSecondary}
+                    />
+                  </View>
+                </View>
+              ))}
+
+              {/* Validation message */}
+              {!isTotalValid && (
+                <Text style={styles.validationWarning}>
+                  Total: {(yourShareNum + totalFriendSplit).toFixed(2)} (should be {amount.toFixed(2)})
+                </Text>
+              )}
+            </View>
+          )}
+
           {/* Truth Summary */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>You Paid</Text>
-              <Text style={styles.summaryValue}>${amount.toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>{youPaidNum.toFixed(2)}</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Your Share</Text>
-              <Text style={styles.summaryValue}>${perPersonAmount.toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>
+                {splitType === 'Equal' ? (amount / participantCount).toFixed(2) : yourShareNum.toFixed(2)}
+              </Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
               <Text style={[styles.summaryLabel, { color: COLORS.success }]}>Lending</Text>
               <Text style={[styles.summaryValue, { color: COLORS.success }]}>
-                ${lendingAmount.toFixed(2)}
+                {splitType === 'Equal'
+                  ? (amount - (amount / participantCount)).toFixed(2)
+                  : (lendingAmount > 0 ? lendingAmount.toFixed(2) : '0.00')}
               </Text>
             </View>
           </View>
@@ -351,6 +625,88 @@ const styles = StyleSheet.create({
   },
   activeChipText: {
     color: COLORS.white,
+  },
+  // Split Input Styles (no currency symbol)
+  splitInputSection: {
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.m,
+    padding: SPACING.s,
+    marginBottom: 12,
+  },
+  splitInputLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  splitInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  splitInputPerson: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  smallAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  smallAvatarText: {
+    color: COLORS.primary,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  splitInputName: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  splitInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.s,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minWidth: 80,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  splitInput: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    flex: 1,
+    textAlign: 'right',
+    padding: 0,
+    minWidth: 50,
+  },
+  splitAmountDisplay: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    paddingRight: 8,
+  },
+  percentSymbol: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginLeft: 4,
+  },
+  validationWarning: {
+    fontSize: 12,
+    color: '#F59E0B',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
   },
   summaryCard: {
     backgroundColor: COLORS.background,

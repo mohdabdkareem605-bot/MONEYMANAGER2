@@ -1,36 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, FlatList, Text, ActivityIndicator, RefreshControl } from 'react-native';
 import { COLORS } from '../../src/constants/theme';
-import { useDataStore } from '../../src/store/dataStore';
+import { useDataStore, convertCurrency } from '../../src/store/dataStore';
 import { useAuth } from '../../src/contexts/AuthContext';
 
 import DashboardHeader from '../../src/components/dashboard/DashboardHeader';
 import CategoryExpenseCard from '../../src/components/dashboard/CategoryExpenseCard';
 
-// Default categories for demo mode
-const DEFAULT_CATEGORIES = [
-  { id: '1', category: 'Food & Dining', count: 0, amount: '0.00', percent: 0 },
-  { id: '2', category: 'Transport', count: 0, amount: '0.00', percent: 0 },
-  { id: '3', category: 'Shopping', count: 0, amount: '0.00', percent: 0 },
-  { id: '4', category: 'Home', count: 0, amount: '0.00', percent: 0 },
-  { id: '5', category: 'Social', count: 0, amount: '0.00', percent: 0 },
-  { id: '6', category: 'Travel', count: 0, amount: '0.00', percent: 0 },
-];
-
 export default function Dashboard() {
   const { user } = useAuth();
-  const { 
-    dashboardSummary, 
+  const {
+    dashboardSummary,
     transactions,
-    fetchDashboard, 
+    userProfile,
+    fetchDashboard,
     fetchTransactions,
     fetchAccounts,
     fetchContacts,
     fetchCategories,
+    fetchUserProfile,
   } = useDataStore();
-  
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentView, setCurrentView] = useState<'cashflow' | 'networth'>('cashflow');
+
+  const primaryCurrency = userProfile?.base_currency || 'USD';
 
   // Load data on mount
   useEffect(() => {
@@ -40,6 +35,7 @@ export default function Dashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
+      await fetchUserProfile(); // Fetch user profile first for currency
       await Promise.all([
         fetchDashboard(),
         fetchTransactions(),
@@ -60,33 +56,72 @@ export default function Dashboard() {
     setRefreshing(false);
   };
 
+  const handleViewChange = (view: 'cashflow' | 'networth') => {
+    setCurrentView(view);
+  };
+
   // Calculate category breakdown from transactions
-  const categoryData = React.useMemo(() => {
+  const categoryData = useMemo(() => {
     if (!transactions || transactions.length === 0) {
-      return DEFAULT_CATEGORIES;
+      return [];
     }
+
+    // Filter based on current view
+    const filterType = currentView === 'cashflow' ? 'EXPENSE' : 'INCOME';
+
+    const relevantTransactions = transactions.filter(tx => {
+      // Filter by transaction type (TRANSFER is excluded from both views)
+      if (tx.transaction_type !== filterType) return false;
+      return true;
+    });
 
     const categoryMap: Record<string, { count: number; total: number }> = {};
     let totalAmount = 0;
 
-    transactions.forEach(tx => {
+    relevantTransactions.forEach(tx => {
       const category = tx.description || 'Other';
+      const txAmount = convertCurrency(
+        Math.abs(tx.total_amount),
+        tx.currency_code || 'USD',
+        primaryCurrency
+      );
+
+      let actualAmount = txAmount;
+
+      // For EXPENSE transactions, deduct DEBT splits (amount owed by others)
+      if (tx.transaction_type === 'EXPENSE' && tx.splits && tx.splits.length > 0) {
+        const debtSplits = tx.splits.filter(s => s.split_type === 'DEBT');
+        const splitTotal = debtSplits.reduce((sum, s) => {
+          return sum + convertCurrency(
+            Number(s.amount),
+            s.currency_code || 'USD',
+            primaryCurrency
+          );
+        }, 0);
+        actualAmount = Math.max(0, txAmount - splitTotal);
+      }
+
       if (!categoryMap[category]) {
         categoryMap[category] = { count: 0, total: 0 };
       }
       categoryMap[category].count += 1;
-      categoryMap[category].total += Math.abs(tx.total_amount);
-      totalAmount += Math.abs(tx.total_amount);
+      categoryMap[category].total += actualAmount;
+      totalAmount += actualAmount;
     });
 
-    return Object.entries(categoryMap).map(([name, data], index) => ({
-      id: String(index),
-      category: name,
-      count: data.count,
-      amount: data.total.toFixed(2),
-      percent: totalAmount > 0 ? data.total / totalAmount : 0,
-    }));
-  }, [transactions]);
+
+    return Object.entries(categoryMap)
+      .map(([name, data], index) => ({
+        id: String(index),
+        category: name,
+        count: data.count,
+        amount: data.total.toFixed(2),
+        percent: totalAmount > 0 ? data.total / totalAmount : 0,
+      }))
+      .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount)); // Sort by amount descending
+  }, [transactions, currentView, primaryCurrency]);
+
+  const sectionTitle = currentView === 'cashflow' ? 'Expenses by Category' : 'Income by Category';
 
   if (loading && !refreshing) {
     return (
@@ -102,30 +137,44 @@ export default function Dashboard() {
       <FlatList
         data={categoryData}
         keyExtractor={(item) => item.id}
-        
+
         ListHeaderComponent={
           <>
-            <DashboardHeader summary={dashboardSummary} />
-            <Text style={styles.sectionTitle}>Expenses by Category</Text>
+            <DashboardHeader
+              summary={dashboardSummary}
+              primaryCurrency={primaryCurrency}
+              onViewChange={handleViewChange}
+            />
+            <Text style={styles.sectionTitle}>{sectionTitle}</Text>
           </>
         }
-        
+
         renderItem={({ item }) => (
-          <CategoryExpenseCard 
+          <CategoryExpenseCard
             category={item.category}
             count={item.count}
             amount={item.amount}
             percent={item.percent}
+            currencyCode={primaryCurrency}
+            isIncome={currentView === 'networth'}
           />
         )}
-        
+
+
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No transactions yet</Text>
-            <Text style={styles.emptySubtext}>Add your first expense to get started</Text>
+            <Text style={styles.emptyText}>
+              {currentView === 'cashflow' ? 'No expenses yet' : 'No income yet'}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {currentView === 'cashflow'
+                ? 'Add your first expense to get started'
+                : 'Add your first income to get started'
+              }
+            </Text>
           </View>
         }
-        
+
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
