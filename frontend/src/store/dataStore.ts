@@ -50,6 +50,7 @@ export interface Transaction {
   id: string;
   created_by: string;
   account_id?: string;
+  destination_account_id?: string; // For transfers
   account_name?: string;
   payer_contact_id?: string;
   payer_name?: string;

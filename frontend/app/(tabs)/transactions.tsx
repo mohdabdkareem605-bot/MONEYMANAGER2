@@ -24,7 +24,7 @@ const formatDate = (dateStr: string) => {
 };
 
 // Group transactions by date
-const groupTransactionsByDate = (transactions: Transaction[]) => {
+const groupTransactionsByDate = (transactions: Transaction[], userAccountIds: string[]) => {
   const groups: Record<string, Transaction[]> = {};
 
   transactions.forEach(tx => {
@@ -38,6 +38,17 @@ const groupTransactionsByDate = (transactions: Transaction[]) => {
   return Object.entries(groups).map(([title, data]) => ({
     title,
     data: data.map(tx => {
+      // Check if this is an INCOMING transfer to one of my accounts
+      const isIncomingTransfer = tx.transaction_type === 'TRANSFER' &&
+        tx.destination_account_id &&
+        userAccountIds.includes(tx.destination_account_id);
+
+      // Determine display type
+      let displayType = tx.transaction_type === 'INCOME' ? 'income' : 'expense';
+      if (isIncomingTransfer) {
+        displayType = 'income'; // Show as Green (+)
+      }
+
       // Calculate net amount (User's share)
       // Total - Splits (Debt)
       const debtAmount = tx.splits?.reduce((sum, s) => sum + (s.amount > 0 ? s.amount : 0), 0) || 0;
@@ -50,7 +61,7 @@ const groupTransactionsByDate = (transactions: Transaction[]) => {
 
       return {
         id: tx.id,
-        type: tx.transaction_type === 'INCOME' ? 'income' : 'expense',
+        type: displayType as 'income' | 'expense',
         desc: tx.description || 'Transaction',
         amount: netAmount > 0 ? netAmount : 0, // Ensure no negative amounts
         currency: tx.currency_code || 'AED', // Fallback to AED if missing, but should exist
@@ -68,7 +79,7 @@ export default function TransactionsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const { transactions, fetchTransactions } = useDataStore();
+  const { transactions, accounts, fetchTransactions } = useDataStore();
 
   useEffect(() => {
     loadData();
@@ -103,8 +114,8 @@ export default function TransactionsScreen() {
       filtered = transactions.filter(t => t.splits && t.splits.length > 0);
     }
 
-    return groupTransactionsByDate(filtered);
-  }, [transactions, activeFilter]);
+    return groupTransactionsByDate(filtered, accounts.map(a => a.id));
+  }, [transactions, activeFilter, accounts]);
 
   if (loading && !refreshing) {
     return (
